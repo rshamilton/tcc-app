@@ -6,7 +6,7 @@
 import Foundation
 
 /// Everything the app saves lives as ordinary files in the app's Documents folder, which iOS shows in the
-/// Files app as "Tree Cost Calculator". That makes it easy to see what uses space and to copy the data.
+/// Files app as "TCC" (the app's display name). That makes it easy to see what uses space and to copy the data.
 ///
 ///     Estimates/EST-0001-1A2B3C4D.json   one small file per estimate
 ///     Photos/<id>.jpg                    photos attached to estimates

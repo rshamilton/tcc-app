@@ -257,7 +257,7 @@ struct SettingsView: View {
     }
 
     private var dataFooter: String {
-        let files = "Everything is saved as ordinary files in the “Tree Cost Calculator” folder in the Files app, so you can see exactly what uses space."
+        let files = "Everything is saved as ordinary files in the “TCC” folder in the Files app, so you can see exactly what uses space."
         if !iCloudAvailable {
             return files + " Sign in to iCloud and turn on iCloud Drive to also back it up automatically."
         }
