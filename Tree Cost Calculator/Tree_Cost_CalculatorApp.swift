@@ -9,9 +9,22 @@ import SwiftUI
 
 @main
 struct Tree_Cost_CalculatorApp: App {
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @StateObject private var quotesManager = QuotesManager()
+    @StateObject private var historyManager = CalculationHistory()
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            Group {
+                if hasCompletedOnboarding {
+                    QuotesListView(quotesManager: quotesManager)
+                        .environmentObject(historyManager)
+                } else {
+                    OnboardingView()
+                        .environmentObject(historyManager)
+                }
+            }
+            .id(hasCompletedOnboarding)
         }
     }
 }

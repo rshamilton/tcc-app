@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Privacy - Camera Usage Description -->
+    <key>NSCameraUsageDescription</key>
+    <string>Allow Tree Cost Calculator to use your camera to take photos for estimates.</string>
+
+    <!-- Privacy - Photo Library Usage Description -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Allow Tree Cost Calculator to access your photos to attach them to estimates.</string>
+
+    <!-- Export Compliance: App Uses Non-Exempt Encryption -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+</dict>
+</plist>
