@@ -6,8 +6,19 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		94CAB3A02F11B00000EE0D07 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 94CAB33F2F11A17D00EE0D9C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 94CAB3462F11A17D00EE0D9C;
+			remoteInfo = "Tree Cost Calculator";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		94CAB3472F11A17D00EE0D9C /* Tree Cost Calculator.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Tree Cost Calculator.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		94CAB3A02F11B00000EE0D01 /* Tree Cost CalculatorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Tree Cost CalculatorUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +27,22 @@
 			path = "Tree Cost Calculator";
 			sourceTree = "<group>";
 		};
+		94CAB3A02F11B00000EE0D02 /* Tree Cost CalculatorUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Tree Cost CalculatorUITests";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		94CAB3442F11A17D00EE0D9C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		94CAB3A02F11B00000EE0D03 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +56,7 @@
 			isa = PBXGroup;
 			children = (
 				94CAB3492F11A17D00EE0D9C /* Tree Cost Calculator */,
+				94CAB3A02F11B00000EE0D02 /* Tree Cost CalculatorUITests */,
 				94CAB3482F11A17D00EE0D9C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				94CAB3472F11A17D00EE0D9C /* Tree Cost Calculator.app */,
+				94CAB3A02F11B00000EE0D01 /* Tree Cost CalculatorUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,6 +95,29 @@
 			productReference = 94CAB3472F11A17D00EE0D9C /* Tree Cost Calculator.app */;
 			productType = "com.apple.product-type.application";
 		};
+		94CAB3A02F11B00000EE0D06 /* Tree Cost CalculatorUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 94CAB3A02F11B00000EE0D09 /* Build configuration list for PBXNativeTarget "Tree Cost CalculatorUITests" */;
+			buildPhases = (
+				94CAB3A02F11B00000EE0D04 /* Sources */,
+				94CAB3A02F11B00000EE0D03 /* Frameworks */,
+				94CAB3A02F11B00000EE0D05 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				94CAB3A02F11B00000EE0D08 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				94CAB3A02F11B00000EE0D02 /* Tree Cost CalculatorUITests */,
+			);
+			name = "Tree Cost CalculatorUITests";
+			packageProductDependencies = (
+			);
+			productName = "Tree Cost CalculatorUITests";
+			productReference = 94CAB3A02F11B00000EE0D01 /* Tree Cost CalculatorUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -82,6 +130,10 @@
 				TargetAttributes = {
 					94CAB3462F11A17D00EE0D9C = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					94CAB3A02F11B00000EE0D06 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 94CAB3462F11A17D00EE0D9C;
 					};
 				};
 			};
@@ -100,12 +152,20 @@
 			projectRoot = "";
 			targets = (
 				94CAB3462F11A17D00EE0D9C /* Tree Cost Calculator */,
+				94CAB3A02F11B00000EE0D06 /* Tree Cost CalculatorUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		94CAB3452F11A17D00EE0D9C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		94CAB3A02F11B00000EE0D05 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +182,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		94CAB3A02F11B00000EE0D04 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		94CAB3A02F11B00000EE0D08 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 94CAB3462F11A17D00EE0D9C /* Tree Cost Calculator */;
+			targetProxy = 94CAB3A02F11B00000EE0D07 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		94CAB3502F11A18000EE0D9C /* Debug */ = {
@@ -178,7 +253,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -237,7 +312,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -253,12 +328,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Config/TreeCostCalculator.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 38H53T49NJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "We need access to your camera to take photos of trees for your estimates.";
+				INFOPLIST_FILE = Config/Info.plist;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Tree Cost Calculator uses the camera so you can photograph trees and job sites for your estimates.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -281,7 +359,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -290,12 +368,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Config/TreeCostCalculator.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 38H53T49NJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "We need access to your camera to take photos of trees for your estimates.";
+				INFOPLIST_FILE = Config/Info.plist;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Tree Cost Calculator uses the camera so you can photograph trees and job sites for your estimates.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -318,7 +399,43 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		94CAB3A02F11B00000EE0D0A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 38H53T49NJ;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = me.ryham.tcc.UITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "Tree Cost Calculator";
+			};
+			name = Debug;
+		};
+		94CAB3A02F11B00000EE0D0B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 38H53T49NJ;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = me.ryham.tcc.UITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "Tree Cost Calculator";
 			};
 			name = Release;
 		};
@@ -339,6 +456,15 @@
 			buildConfigurations = (
 				94CAB3532F11A18000EE0D9C /* Debug */,
 				94CAB3542F11A18000EE0D9C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		94CAB3A02F11B00000EE0D09 /* Build configuration list for PBXNativeTarget "Tree Cost CalculatorUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				94CAB3A02F11B00000EE0D0A /* Debug */,
+				94CAB3A02F11B00000EE0D0B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
