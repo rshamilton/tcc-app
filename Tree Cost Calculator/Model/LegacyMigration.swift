@@ -12,6 +12,12 @@ nonisolated enum LegacyMigration {
     static let historyKey = "SavedCalculations"
     static let logoKey = "companyLogoData"
 
+    /// True when version 1 left quotes that haven't been brought over yet.
+    static var hasUnmigratedData: Bool {
+        let defaults = UserDefaults.standard
+        return !defaults.bool(forKey: SettingsKey.migratedLegacy) && defaults.data(forKey: quotesKey) != nil
+    }
+
     // MARK: Legacy shapes (decode-only)
 
     private struct LegacyTree: Decodable {

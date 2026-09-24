@@ -52,10 +52,11 @@ final class EstimateStore: ObservableObject {
         return e
     }
 
-    /// Saves edits to an existing estimate. Does nothing if it has been deleted.
+    /// Saves edits to an existing estimate. Does nothing if it has been deleted or nothing changed
+    /// (so just opening an estimate doesn't move it to the top of the list).
     func update(_ estimate: Estimate) {
         guard let index = estimates.firstIndex(where: { $0.id == estimate.id }) else { return }
-        guard estimates[index] != estimate else { return }
+        guard !estimates[index].hasSameContent(as: estimate) else { return }
         var updated = estimate
         updated.updatedAt = Date()
         estimates[index] = updated
@@ -155,8 +156,12 @@ final class EstimateStore: ObservableObject {
         BackupScheduler.shared.schedule()
     }
 
-    /// Reads every estimate file from the data folder. Called once at launch, after any restore.
+    /// Reads every estimate file from the data folder. Called at launch and after restoring from the backup.
     func reload() {
+        // Unsaved edits would otherwise be replaced by the older copy on disk.
+        saveTask?.cancel()
+        saveTask = nil
+        write()
         DataFolder.prepare()
         importPreviousStorageIfNeeded()
 
@@ -173,6 +178,8 @@ final class EstimateStore: ObservableObject {
             }
         }
         estimates = loaded
+        // Left behind if the app was closed while a new, still empty estimate was open.
+        for estimate in loaded where estimate.isBlank { delete(id: estimate.id) }
 
         // A reinstall resets the counter, so never hand out a number that is already in use.
         let highest = loaded.map(\.number).max() ?? 0

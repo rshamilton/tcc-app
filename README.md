@@ -20,8 +20,8 @@ device; there are no accounts, servers or analytics.
 
 - `Model/`: `Estimate` (the single data model and all price math), `EstimateStore` (one JSON file per estimate),
   `DataFolder` (the visible "TCC" folder in Files), `PhotoStore` (photos and logo as files),
-  `SettingsFile` (settings copied to `Settings.json`), `BackupMirror` (automatic iCloud Drive copy and restore after a
-  reinstall), `LegacyMigration` (imports data from version 1), `AppSettings`, `Format`.
+  `SettingsFile` (settings copied to `Settings.json`), `BackupMirror` (automatic iCloud Drive copy, restore on a new
+  device or after a reinstall, and Settings ▸ Restore from iCloud), `LegacyMigration` (imports data from version 1), `AppSettings`, `Format`.
 - `Views/`: estimate list, estimate editor, settings, onboarding, PDF preview, shared components.
 - `PDF/EstimatePDF.swift`: paginated PDF layout (US Letter or A4 depending on region).
 

@@ -16,6 +16,9 @@ import UIKit
 ///   -showSettings        present Settings on launch
 ///   -showPreview         open the PDF preview when the editor appears
 ///   -onboardingPage N    start onboarding on page N
+///   -backupDir <path>    use this folder instead of iCloud Drive for the backup
+///   -simulateFreshInstall  wipe the data folder and settings first, as if the app was just installed
+///   -linkBackup          let this device update the backup's settings and logo straight away
 nonisolated enum DebugLaunch {
     private static let args = ProcessInfo.processInfo.arguments
 
@@ -31,8 +34,21 @@ nonisolated enum DebugLaunch {
     static var showPreview: Bool { has("-showPreview") }
     static var onboardingPage: Int { value(after: "-onboardingPage").flatMap(Int.init) ?? 0 }
 
+    /// Runs before anything is loaded.
+    static func simulateFreshInstallIfRequested() {
+        guard has("-simulateFreshInstall") else { return }
+        let fm = FileManager.default
+        for url in (try? fm.contentsOfDirectory(at: DataFolder.root, includingPropertiesForKeys: nil)) ?? [] {
+            try? fm.removeItem(at: url)
+        }
+        if let domain = Bundle.main.bundleIdentifier { UserDefaults.standard.removePersistentDomain(forName: domain) }
+    }
+
     @MainActor
     static func seedIfRequested(_ store: EstimateStore) {
+        if has("-linkBackup") {
+            UserDefaults.standard.set(true, forKey: SettingsKey.backupLinked)
+        }
         if has("-resetOnboarding") {
             UserDefaults.standard.set(false, forKey: SettingsKey.onboarded)
         }
@@ -44,6 +60,8 @@ nonisolated enum DebugLaunch {
         guard has("-demoData") else { return }
         for e in store.estimates { store.delete(id: e.id) }
         UserDefaults.standard.set(1, forKey: SettingsKey.nextNumber)
+        // Saved like a real user finishing onboarding (a launch argument alone isn't backed up).
+        UserDefaults.standard.set(true, forKey: SettingsKey.onboarded)
         UserDefaults.standard.set("Oakridge Tree Service", forKey: SettingsKey.companyName)
         UserDefaults.standard.set("(555) 014-2290", forKey: SettingsKey.companyPhone)
         UserDefaults.standard.set("quotes@oakridgetree.example", forKey: SettingsKey.companyEmail)

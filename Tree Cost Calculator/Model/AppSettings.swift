@@ -28,6 +28,8 @@ nonisolated enum SettingsKey {
     static let migratedLegacy = "didMigrateLegacyData"
     static let iCloudBackup = "iCloudBackupEnabled"
     static let lastBackup = "lastBackupDate"
+    /// Whether this device keeps the backup's settings and logo up to date (see `LaunchCoordinator`).
+    static let backupLinked = "backupLinkedToThisDevice"
 }
 
 enum AppDefaults {

@@ -76,26 +76,23 @@ struct EstimateEditorView: View {
         .onChange(of: estimate) { _, updated in
             store.update(updated)
         }
+        .onChange(of: store.estimate(id: estimate.id)) { _, stored in
+            // Changed somewhere else (status set from the list on iPad, or restored from the backup):
+            // show that version instead of later saving over it with this stale copy.
+            if let stored, !stored.hasSameContent(as: estimate) { estimate = stored }
+        }
         .onDisappear {
+            // Blank estimates are discarded by the list when you leave them, not here: this also runs
+            // while the camera covers the screen.
             store.update(estimate)
-            if estimate.isBlank { store.delete(id: estimate.id) }
         }
         .task {
             #if DEBUG
             if DebugLaunch.showPreview { showPreview = true }
             #endif
-            // A brand-new estimate opens straight into the first measurement. Focus is ignored while
-            // the screen is still animating in, so retry until it sticks (or the user goes elsewhere).
+            // A brand-new estimate opens straight into the first measurement.
             if estimate.isBlank, let first = estimate.trees.first {
-                let target = EditorField.circumference(first.id)
-                for attempt in 0..<8 {
-                    try? await Task.sleep(for: .milliseconds(attempt == 0 ? 450 : 300))
-                    if Task.isCancelled { return }
-                    if let current = focus, current != target { return }
-                    focus = target
-                    try? await Task.sleep(for: .milliseconds(100))
-                    if focus == target { return }
-                }
+                await focusWhenReady(.circumference(first.id), firstDelay: 450)
             }
         }
     }
@@ -467,9 +464,20 @@ struct EstimateEditorView: View {
     private func addTree() {
         let tree = TreeItem()
         withAnimation { estimate.trees.append(tree) }
-        Task {
-            try? await Task.sleep(for: .milliseconds(250))
-            focus = .circumference(tree.id)
+        Task { await focusWhenReady(.circumference(tree.id), firstDelay: 250) }
+    }
+
+    /// Focus is ignored while a screen or row is still animating in, so retry until it sticks
+    /// (or the user has moved to another field).
+    private func focusWhenReady(_ target: EditorField, firstDelay: Int) async {
+        let start = focus
+        for attempt in 0..<10 {
+            try? await Task.sleep(for: .milliseconds(attempt == 0 ? firstDelay : 300))
+            if Task.isCancelled { return }
+            if let current = focus, current != target, current != start { return }
+            focus = target
+            try? await Task.sleep(for: .milliseconds(100))
+            if focus == target { return }
         }
     }
 

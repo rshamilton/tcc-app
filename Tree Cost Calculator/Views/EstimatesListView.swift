@@ -11,6 +11,11 @@ struct EstimatesListView: View {
 
     /// The open estimate. On iPhone this drives a push; on iPad it fills the detail pane.
     @State private var selection: UUID?
+    /// Which column shows when the split view is collapsed (iPhone). Set explicitly so opening an
+    /// estimate from code always works, even when its row isn't in the list (empty state, filter, search).
+    @State private var compactColumn = NavigationSplitViewColumn.sidebar
+    /// A new first estimate, opened once the list has replaced the empty state (see `newEstimate`).
+    @State private var openWhenListAppears: UUID?
     @State private var search = ""
     @State private var filter: EstimateStatus?
     @State private var showSettings = false
@@ -30,7 +35,7 @@ struct EstimatesListView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(preferredCompactColumn: $compactColumn) {
             sidebar
         } detail: {
             detail
@@ -50,13 +55,19 @@ struct EstimatesListView: View {
         }
         .onChange(of: store.estimates) { _, _ in
             // The open estimate was deleted (from the list, or from inside the editor).
-            if let id = selection, store.estimate(id: id) == nil { selection = nil }
+            if let id = selection, store.estimate(id: id) == nil { close() }
+        }
+        .onChange(of: selection) { old, id in
+            // Tapping a row sets the selection; make sure the editor is what's showing on iPhone.
+            if id != nil { compactColumn = .detail }
+            // Leaving an estimate that was never filled in throws it away.
+            if let old, old != id, store.estimate(id: old)?.isBlank == true { store.delete(id: old) }
         }
         #if DEBUG
         .task {
             if DebugLaunch.showSettings { showSettings = true }
             if let index = DebugLaunch.openEstimateIndex, selection == nil, store.sortedEstimates.indices.contains(index) {
-                selection = store.sortedEstimates[index].id
+                open(store.sortedEstimates[index].id)
             }
         }
         #endif
@@ -70,6 +81,12 @@ struct EstimatesListView: View {
                 emptyState
             } else {
                 list
+                    .onAppear {
+                        if let id = openWhenListAppears {
+                            openWhenListAppears = nil
+                            open(id)
+                        }
+                    }
             }
         }
         .navigationTitle("Estimates")
@@ -263,15 +280,40 @@ struct EstimatesListView: View {
     }
 
     private func newEstimate() {
+        // A filter or search would hide the new estimate's row.
+        filter = nil
+        search = ""
         // If an empty estimate is already open (iPad), keep using it rather than piling up blanks.
-        if let id = selection, let current = store.estimate(id: id), current.isBlank { return }
-        selection = store.createEstimate().id
+        if let id = selection, let current = store.estimate(id: id), current.isBlank {
+            open(id)
+            return
+        }
+        let wasEmpty = store.estimates.isEmpty
+        let id = store.createEstimate().id
+        if wasEmpty {
+            // The first estimate swaps the empty state for the list. Navigating during that swap can be
+            // dropped by the split view (the button then seemed to do nothing), so wait for the list.
+            openWhenListAppears = id
+        } else {
+            open(id)
+        }
     }
 
     private func duplicate(_ estimate: Estimate) {
-        if let copy = store.duplicate(id: estimate.id) {
-            selection = copy.id
-        }
+        guard let copy = store.duplicate(id: estimate.id) else { return }
+        filter = nil
+        search = ""
+        open(copy.id)
+    }
+
+    private func open(_ id: UUID) {
+        selection = id
+        compactColumn = .detail
+    }
+
+    private func close() {
+        selection = nil
+        compactColumn = .sidebar
     }
 }
 

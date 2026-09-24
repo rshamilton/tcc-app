@@ -25,7 +25,14 @@ nonisolated enum SettingsFile {
     private static func snapshot(from defaults: UserDefaults) -> [String: Any] {
         var result: [String: Any] = [:]
         for key in bools + doubles + ints + strings {
-            guard let value = defaults.object(forKey: key) as? NSObject else { continue }
+            guard defaults.object(forKey: key) != nil else { continue }
+            // Read with the setting's own type, so e.g. a "YES" string still saves as a Bool.
+            let value: NSObject
+            if bools.contains(key) { value = defaults.bool(forKey: key) as NSNumber }
+            else if doubles.contains(key) { value = defaults.double(forKey: key) as NSNumber }
+            else if ints.contains(key) { value = defaults.integer(forKey: key) as NSNumber }
+            else if let text = defaults.string(forKey: key) { value = text as NSString }
+            else { continue }
             if let standard = AppDefaults.registered[key] as? NSObject, standard.isEqual(value) { continue }
             result[key] = value
         }
@@ -55,17 +62,20 @@ nonisolated enum SettingsFile {
         }
     }
 
-    /// Loads `Settings.json` into UserDefaults (used after restoring a backup on a fresh install).
-    static func applyIfPresent() {
-        guard let data = try? Data(contentsOf: DataFolder.settings),
-              let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+    /// Loads settings saved in a `Settings.json` (from the backup) into UserDefaults. Settings it doesn't
+    /// mention keep their current value, and the next estimate number never goes down (so a number
+    /// already used on this device isn't handed out again). Returns false if the file can't be read.
+    @discardableResult
+    static func apply(_ data: Data) -> Bool {
+        guard let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
         let defaults = UserDefaults.standard
         for (key, value) in dict {
             if bools.contains(key), let v = value as? Bool { defaults.set(v, forKey: key) }
             else if doubles.contains(key), let v = value as? Double { defaults.set(v, forKey: key) }
+            else if key == SettingsKey.nextNumber, let v = value as? Int { defaults.set(max(v, defaults.integer(forKey: key)), forKey: key) }
             else if ints.contains(key), let v = value as? Int { defaults.set(v, forKey: key) }
             else if strings.contains(key), let v = value as? String { defaults.set(v, forKey: key) }
         }
-        lock.lock(); lastWritten = data; lock.unlock()
+        return true
     }
 }

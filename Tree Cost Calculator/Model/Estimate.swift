@@ -238,6 +238,13 @@ nonisolated struct Estimate: Identifiable, Codable, Equatable {
 
     var allPhotoIDs: [UUID] { sitePhotoIDs + trees.flatMap(\.photoIDs) }
 
+    /// Equal apart from `updatedAt`, which the store sets itself.
+    func hasSameContent(as other: Estimate) -> Bool {
+        var copy = other
+        copy.updatedAt = updatedAt
+        return self == copy
+    }
+
     /// All money is rounded to whole cents at each step so the lines on screen and on
     /// the PDF always add up to exactly the total.
     var totals: EstimateTotals {

@@ -203,8 +203,12 @@ final class EstimatePDF {
         headerRow()
 
         let font = UIFont.systemFont(ofSize: 10)
-        for (offset, tree) in measured.enumerated() {
-            let description = tree.label.trimmed.isEmpty ? "Tree \(offset + 1)" : tree.label.trimmed
+        // Numbered by position in the estimate, like the editor and the photo captions, even if a tree
+        // without measurements is left out.
+        let numbered = estimate.trees.enumerated().filter { $0.element.isMeasured }
+        for (offset, (index, tree)) in numbered.enumerated() {
+            let number = index + 1
+            let description = tree.label.trimmed.isEmpty ? "Tree \(number)" : tree.label.trimmed
             let textHeight = measure(description, width: descW - 8, font: font)
             let rowHeight = max(24, textHeight + 12)
             if y + rowHeight > bottomLimit {
@@ -215,7 +219,7 @@ final class EstimatePDF {
                 fill(CGRect(x: margin, y: y, width: contentWidth, height: rowHeight), color: tint.withAlphaComponent(0.55), radius: 4)
             }
             let ty = y + (rowHeight - 12) / 2
-            drawText("\(offset + 1)", x: margin + 8, y: ty, width: numberW, font: font, color: muted)
+            drawText("\(number)", x: margin + 8, y: ty, width: numberW, font: font, color: muted)
             drawText(description, x: descX, y: y + 6, width: descW - 8, font: font, color: ink)
             drawText(Format.length(tree.circumference, in: units), x: circX, y: ty, width: circW, font: font, color: ink, align: .right)
             drawText(Format.length(tree.height, in: units), x: heightX, y: ty, width: heightW, font: font, color: ink, align: .right)
@@ -223,6 +227,7 @@ final class EstimatePDF {
             y += rowHeight
         }
 
+        ensureSpace(44)
         y += 6
         line(from: CGPoint(x: margin, y: y), to: CGPoint(x: pageRect.width - margin, y: y))
         y += 8

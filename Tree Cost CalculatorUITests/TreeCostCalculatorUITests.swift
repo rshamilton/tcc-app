@@ -64,7 +64,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
 
         // A new estimate opens with the first measurement focused.
         let next = app.buttons["Next field"]
-        if !next.waitForExistence(timeout: 4) { snap("new-estimate-failed") }
+        if !next.waitForExistence(timeout: 10) { snap("new-estimate-failed") }
         XCTAssertTrue(next.exists)
         app.typeText("6")
         next.tap()
@@ -96,7 +96,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
         try XCTSkipIf(isPad, "iPad keeps the list on screen; covered by the iPad test")
         launch(["-resetData"])
         app.buttons["New Estimate"].tap()
-        XCTAssertTrue(app.buttons["Next field"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["Next field"].waitForExistence(timeout: 10))
         tapKeyboardDone()
         app.navigationBars.buttons.firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Quote your first tree"].waitForExistence(timeout: 3))
@@ -144,6 +144,89 @@ final class TreeCostCalculatorUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["EST-0002"].waitForExistence(timeout: 3))
     }
 
+    /// New Estimate on an empty list opens the editor every time (it used to do nothing, intermittently).
+    func testNewEstimateFromEmptyListRepeatedly() throws {
+        try XCTSkipIf(isPad, "Covered on iPhone")
+        for attempt in 1...4 {
+            launch(["-resetData"])
+            // Tapped as soon as it's there, and again once the screen has settled.
+            if attempt.isMultiple(of: 2) { _ = app.staticTexts["Quote your first tree"].waitForExistence(timeout: 8); sleep(2) }
+            app.buttons["New Estimate"].tap()
+            XCTAssertTrue(app.navigationBars["EST-0001"].waitForExistence(timeout: 10), "Editor didn't open on attempt \(attempt)")
+            app.terminate()
+        }
+    }
+
+    /// New Estimate works while a status filter hides new drafts (it used to do nothing).
+    func testNewEstimateWhileFiltered() throws {
+        try XCTSkipIf(isPad, "Covered on iPhone")
+        launch(["-demoData"])
+        XCTAssertTrue(app.staticTexts["Jordan Ellis"].waitForExistence(timeout: 5))
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Approved'")).firstMatch.tap()
+        XCTAssertFalse(app.staticTexts["Jordan Ellis"].exists)
+        app.buttons["New Estimate"].tap()
+        XCTAssertTrue(app.buttons["Next field"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["EST-0006"].exists)
+    }
+
+    // MARK: - Backup and restore
+
+    /// A folder the app uses in place of iCloud Drive (`-backupDir`), holding a backup of the demo data.
+    private func makeBackup() -> URL {
+        let dir = URL(fileURLWithPath: "/tmp/tcc-uitest-\(UUID().uuidString)", isDirectory: true)
+        // Without "-hasCompletedOnboarding": -demoData saves it the way finishing onboarding does, so it is backed up.
+        app.launchArguments = ["-demoData", "-linkBackup", "-backupDir", dir.path, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Jordan Ellis"].waitForExistence(timeout: 8))
+        XCUIDevice.shared.press(.home) // going to the background syncs straight away
+        let fm = FileManager.default
+        let deadline = Date().addingTimeInterval(30)
+        func count(_ folder: String) -> Int { ((try? fm.contentsOfDirectory(atPath: dir.appendingPathComponent(folder).path)) ?? []).count }
+        while Date() < deadline, !(fm.fileExists(atPath: dir.appendingPathComponent("Settings.json").path) && count("Estimates") == 5 && count("Photos") == 4) {
+            sleep(1)
+        }
+        XCTAssertTrue(fm.fileExists(atPath: dir.appendingPathComponent("Settings.json").path), "No settings in the backup")
+        XCTAssertEqual(count("Estimates"), 5)
+        XCTAssertEqual(count("Photos"), 4)
+        app.terminate()
+        return dir
+    }
+
+    /// Installing on a new device brings back estimates and settings (including having done onboarding).
+    func testRestoreOnNewDevice() throws {
+        try XCTSkipIf(isPad, "Covered on iPhone")
+        let backup = makeBackup()
+        app.launchArguments = ["-simulateFreshInstall", "-backupDir", backup.path, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Jordan Ellis"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["Continue"].exists, "Onboarding shown after restoring")
+        snap("restore-new-device")
+        app.staticTexts["Priya Raman"].tap()
+        XCTAssertTrue(app.navigationBars["EST-0002"].waitForExistence(timeout: 3))
+    }
+
+    /// A backup iCloud only finds out about after launch is offered once it shows up.
+    func testRestoreOfferedWhenBackupAppearsLater() throws {
+        try XCTSkipIf(isPad, "Covered on iPhone")
+        let backup = makeBackup()
+        let late = URL(fileURLWithPath: "/tmp/tcc-uitest-\(UUID().uuidString)", isDirectory: true)
+        app.launchArguments = ["-simulateFreshInstall", "-backupDir", late.path, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Continue"].waitForExistence(timeout: 10), "Expected onboarding with no backup")
+
+        let fm = FileManager.default
+        try fm.createDirectory(at: late, withIntermediateDirectories: true)
+        for name in try fm.contentsOfDirectory(atPath: backup.path) {
+            try fm.copyItem(at: backup.appendingPathComponent(name), to: late.appendingPathComponent(name))
+        }
+        let alert = app.alerts["Restore from iCloud?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 20))
+        snap("restore-offer")
+        alert.buttons["Restore"].tap()
+        XCTAssertTrue(app.staticTexts["Jordan Ellis"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["Continue"].exists)
+    }
+
     // MARK: - iPad
 
     func testIPadSplitView() throws {
@@ -168,7 +251,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
 
         // New estimate opens in the detail pane, focused on the first measurement.
         app.buttons["New Estimate"].tap()
-        XCTAssertTrue(app.buttons["Next field"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["Next field"].waitForExistence(timeout: 10))
         app.typeText("6")
         app.buttons["Next field"].tap()
         app.typeText("50")

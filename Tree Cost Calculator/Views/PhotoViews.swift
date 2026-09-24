@@ -14,6 +14,8 @@ struct PhotoThumbnail: View {
     var size: CGFloat = 84
 
     @State private var image: UIImage?
+    /// Bumped when the photo arrives from the backup after this view first tried to load it.
+    @State private var attempt = 0
 
     var body: some View {
         ZStack {
@@ -26,12 +28,15 @@ struct PhotoThumbnail: View {
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .task(id: id) {
+        .task(id: "\(id.uuidString)-\(attempt)") {
             let pixels = Int(size * 3)
             let photoID = id
             image = await Task.detached(priority: .userInitiated) {
                 PhotoStore.image(for: photoID, maxPixel: pixels)
             }.value
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .photoRestored)) { note in
+            if image == nil, note.object as? UUID == id { attempt += 1 }
         }
     }
 }
@@ -151,6 +156,7 @@ struct PhotoViewer: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var image: UIImage?
+    @State private var attempt = 0
     @State private var confirmDelete = false
 
     var body: some View {
@@ -187,11 +193,14 @@ struct PhotoViewer: View {
                 Button("Cancel", role: .cancel) {}
             }
         }
-        .task {
+        .task(id: attempt) {
             let photoID = id
             image = await Task.detached(priority: .userInitiated) {
                 PhotoStore.image(for: photoID, maxPixel: 2000)
             }.value
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .photoRestored)) { note in
+            if image == nil, note.object as? UUID == id { attempt += 1 }
         }
     }
 }

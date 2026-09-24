@@ -15,6 +15,7 @@ enum AppLinks {
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var launch: LaunchCoordinator
 
     @AppStorage(SettingsKey.companyName) private var companyName = ""
     @AppStorage(SettingsKey.companyPhone) private var companyPhone = ""
@@ -36,6 +37,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.iCloudBackup) private var iCloudBackup = true
     @State private var usage: DataFolder.Usage?
     @State private var lastBackup: Date?
+    @State private var confirmRestore = false
     private let iCloudAvailable = BackupLocation.isAvailable
 
     @State private var path: [UUID] = []
@@ -290,6 +292,19 @@ struct SettingsView: View {
                 }
             } label: {
                 Label("Show in Files", systemImage: "folder")
+            }
+            if iCloudAvailable {
+                Button {
+                    confirmRestore = true
+                } label: {
+                    Label("Restore from iCloud", systemImage: "icloud.and.arrow.down")
+                }
+                .confirmationDialog("Restore from iCloud?", isPresented: $confirmRestore, titleVisibility: .visible) {
+                    Button("Restore") { launch.restoreFromBackup() }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Brings back estimates and photos from your iCloud Drive backup that aren't on this device, and updates estimates that were changed on another device. Your settings are replaced by the ones in the backup. Nothing is deleted.")
+                }
             }
         } header: {
             Text("Your Data")
