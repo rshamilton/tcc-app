@@ -10,12 +10,6 @@ No ads, no subscription, no account, works offline, and the code is open source 
 
 ![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg) ![Platform: iOS 17+](https://img.shields.io/badge/iOS-17%2B-lightgrey.svg) ![Swift](https://img.shields.io/badge/Swift-SwiftUI-orange.svg)
 
-<p>
-  <img src="AppStore/Screenshots/iPhone-6.5in-1284x2778/01-estimates.jpg" width="190" alt="List of tree removal estimates with open and approved totals">
-  <img src="AppStore/Screenshots/iPhone-6.5in-1284x2778/02-trees-and-photos.jpg" width="190" alt="Estimate editor with tree circumference, height, volume and photos">
-  <img src="AppStore/Screenshots/iPhone-6.5in-1284x2778/04-summary.jpg" width="190" alt="Price summary with starting fee, additional charge, discount, tax and total">
-  <img src="AppStore/Screenshots/iPhone-6.5in-1284x2778/05-pdf-estimate.jpg" width="190" alt="Professional PDF tree removal estimate with logo and itemized trees">
-</p>
 
 ## What it does
 
@@ -110,7 +104,6 @@ Debug builds understand a few launch arguments (see `Model/DebugLaunch.swift`), 
 | `Tree Cost Calculator/` | The iOS app (SwiftUI, iOS 17+, iPhone and iPad). |
 | `Tree Cost CalculatorUITests/` | UI tests for the main flows. |
 | `website/` | The public website (plain HTML, no build step), published from `rshamilton/treecostcalculator` with GitHub Pages. |
-| `AppStore/` | App Store listing: metadata text, screenshots and a submission checklist (`AppStore/README.md`). |
 | `Config/` | The iCloud entitlements file and the Info.plist additions. |
 
 Inside the app:

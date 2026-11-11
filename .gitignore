@@ -15,3 +15,6 @@ build/
 # Large media
 *.mov
 *.mp4
+
+# App Store listing materials, screenshots and release strategy (kept private)
+AppStore/
