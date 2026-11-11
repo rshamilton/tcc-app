@@ -4,12 +4,15 @@
 //
 
 import SwiftUI
+import UIKit
 
 /// Every input that can hold keyboard focus, so "Next" / "Previous" can walk the whole form.
 enum EditorField: Hashable {
     case label(UUID), circumference(UUID), height(UUID)
     case name, phone, email, address
+    case itemName(UUID), itemQuantity(UUID), itemPrice(UUID)
     case fee, rate, surchargeLabel, surchargeAmount, discount, tax
+    case deposit, amountPaid
     case notes
 }
 
@@ -17,12 +20,15 @@ struct EstimateEditorView: View {
     @EnvironmentObject private var store: EstimateStore
     @Environment(\.dismiss) private var dismiss
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     @AppStorage(SettingsKey.taxRegions) private var regionList = TaxRegionList()
+    @AppStorage(SettingsKey.services) private var services = ServiceList()
 
     @State private var estimate: Estimate
-    /// Changes whenever the tax rate is set from a region, so its text field reloads the new value.
-    @State private var taxFieldToken = UUID()
     @State private var showPreview = false
+    @State private var showContacts = false
+    @State private var showSignature = false
     @State private var confirmDelete = false
     @FocusState private var focus: EditorField?
 
@@ -36,10 +42,13 @@ struct EstimateEditorView: View {
     var body: some View {
         List {
             treesSection
+            otherWorkSection
             customerSection
             sitePhotosSection
             pricingSection
+            paymentSection
             summarySection
+            signatureSection
             notesSection
         }
         .listStyle(.insetGrouped)
@@ -47,7 +56,7 @@ struct EstimateEditorView: View {
         .frame(maxWidth: 720)
         .frame(maxWidth: .infinity)
         .background(Color(.systemGroupedBackground))
-        .navigationTitle(estimate.numberLabel)
+        .navigationTitle(estimate.documentLabel)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
@@ -61,8 +70,22 @@ struct EstimateEditorView: View {
             if focus == nil { bottomBar }
         }
         .sheet(isPresented: $showPreview) {
-            EstimatePreviewSheet(estimate: estimate)
-                .pageSizedSheet()
+            EstimatePreviewSheet(estimate: estimate, onShared: {
+                if estimate.status == .draft { estimate.status = .sent }
+            })
+            .pageSizedSheet()
+        }
+        .sheet(isPresented: $showContacts) {
+            ContactPicker { contact in
+                importContact(contact)
+                showContacts = false
+            }
+            .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showSignature) {
+            SignatureCaptureSheet(customerName: estimate.customerName) { png, name in
+                saveSignature(png, name: name)
+            }
         }
         .confirmationDialog("Delete this estimate?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete Estimate", role: .destructive) {
@@ -140,10 +163,77 @@ struct EstimateEditorView: View {
         }
     }
 
+    // MARK: - Other work
+
+    private var otherWorkSection: some View {
+        Section {
+            ForEach(estimate.lineItems) { item in
+                LineItemRow(item: lineItemBinding(item.id), focus: $focus)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) { deleteLineItem(item.id) } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+            }
+            Menu {
+                ForEach(services.items) { service in
+                    Button(serviceTitle(service)) { addLineItem(LineItem(service: service)) }
+                }
+                if !services.items.isEmpty { Divider() }
+                Button {
+                    addLineItem(LineItem(), focusName: true)
+                } label: {
+                    Label("Custom item", systemImage: "square.and.pencil")
+                }
+            } label: {
+                Label("Add Other Work", systemImage: "plus.circle.fill")
+                    .font(.body.weight(.semibold))
+            }
+            .accessibilityHint("Choose from your price list or add a custom item")
+        } header: {
+            Text("Other Work")
+        } footer: {
+            Text("Priced as quantity × price, for example stump grinding by the inch or a crew by the hour. Edit your price list in Settings.")
+        }
+    }
+
+    private func serviceTitle(_ service: ServiceItem) -> String {
+        guard service.unitPrice > 0 else { return service.name }
+        let unit = service.unit.trimmed
+        return "\(service.name) — \(Format.unitPrice(service.unitPrice))" + (unit.isEmpty ? "" : "/\(unit)")
+    }
+
+    private func lineItemBinding(_ id: UUID) -> Binding<LineItem> {
+        Binding(
+            get: { estimate.lineItems.first(where: { $0.id == id }) ?? LineItem(id: id) },
+            set: { newValue in
+                if let index = estimate.lineItems.firstIndex(where: { $0.id == id }) {
+                    estimate.lineItems[index] = newValue
+                }
+            }
+        )
+    }
+
+    private func addLineItem(_ item: LineItem, focusName: Bool = false) {
+        withAnimation { estimate.lineItems.append(item) }
+        let target: EditorField = focusName ? .itemName(item.id) : .itemQuantity(item.id)
+        Task { await focusWhenReady(target, firstDelay: 250) }
+    }
+
+    private func deleteLineItem(_ id: UUID) {
+        withAnimation { estimate.lineItems.removeAll { $0.id == id } }
+    }
+
     // MARK: - Customer
 
     private var customerSection: some View {
         Section("Customer") {
+            Button {
+                showContacts = true
+            } label: {
+                Label("Import from Contacts", systemImage: "person.crop.circle.badge.plus")
+            }
+            .accessibilityHint("Fills in the name, phone, email and address from a contact you pick")
             IconField(symbol: "person.fill", placeholder: "Customer name", text: $estimate.customerName)
                 .textContentType(.name)
                 .textInputAutocapitalization(.words)
@@ -162,7 +252,65 @@ struct EstimateEditorView: View {
                 .textContentType(.fullStreetAddress)
                 .textInputAutocapitalization(.words)
                 .focused($focus, equals: .address)
+            quickActions
         }
+    }
+
+    @ViewBuilder
+    private var quickActions: some View {
+        let callURL = phoneURL
+        let mailURL = mailtoURL
+        let mapURL = directionsURL
+        if callURL != nil || mailURL != nil || mapURL != nil {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 20) { quickLinks(callURL, mailURL, mapURL) }
+                VStack(alignment: .leading, spacing: 10) { quickLinks(callURL, mailURL, mapURL) }
+            }
+            .font(.subheadline)
+            .buttonStyle(.borderless)
+        }
+    }
+
+    @ViewBuilder
+    private func quickLinks(_ call: URL?, _ mail: URL?, _ map: URL?) -> some View {
+        if let call { Link(destination: call) { Label("Call", systemImage: "phone.fill") } }
+        if let mail { Link(destination: mail) { Label("Email", systemImage: "envelope.fill") } }
+        if let map { Link(destination: map) { Label("Directions", systemImage: "arrow.triangle.turn.up.right.diamond.fill") } }
+    }
+
+    private var phoneURL: URL? {
+        let raw = estimate.customerPhone.trimmed
+        var digits = raw.filter { $0.isASCII && $0.isNumber }
+        guard !digits.isEmpty else { return nil }
+        if raw.hasPrefix("+") { digits = "+" + digits }
+        return URL(string: "tel:\(digits)")
+    }
+
+    private var mailtoURL: URL? {
+        let email = estimate.customerEmail.trimmed
+        guard email.contains("@") else { return nil }
+        return URL(string: "mailto:\(email.addingPercentEncoding(withAllowedCharacters: Self.queryAllowed) ?? email)")
+    }
+
+    private var directionsURL: URL? {
+        let address = estimate.address.trimmed
+        guard !address.isEmpty, let encoded = address.addingPercentEncoding(withAllowedCharacters: Self.queryAllowed) else { return nil }
+        return URL(string: "http://maps.apple.com/?daddr=\(encoded)")
+    }
+
+    /// Like URL-query-allowed, but also escapes the characters that would end or split a query value.
+    private static let queryAllowed: CharacterSet = {
+        var set = CharacterSet.urlQueryAllowed
+        set.remove(charactersIn: "&+=?#")
+        return set
+    }()
+
+    /// The user picked the contact on purpose, so its details replace what's there (only where it has something).
+    private func importContact(_ contact: ImportedContact) {
+        if !contact.name.isEmpty { estimate.customerName = contact.name }
+        if !contact.phone.isEmpty { estimate.customerPhone = contact.phone }
+        if !contact.email.isEmpty { estimate.customerEmail = contact.email }
+        if !contact.address.isEmpty { estimate.address = contact.address }
     }
 
     private var sitePhotosSection: some View {
@@ -181,44 +329,18 @@ struct EstimateEditorView: View {
     private var pricingSection: some View {
         Section {
             LabeledContent("Starting fee") {
-                NumberField(placeholder: "0", value: $estimate.startingFee, prefix: Format.currencySymbol)
+                NumberField(placeholder: "0", value: $estimate.startingFee, prefix: Format.currencySymbol,
+                            accessibilityLabel: "Starting fee")
                     .focused($focus, equals: .fee)
             }
             LabeledContent("Price per \(units.volumeUnit)") {
-                NumberField(placeholder: "0", value: $estimate.ratePerUnit, prefix: Format.currencySymbol)
+                NumberField(placeholder: "0", value: $estimate.ratePerUnit, prefix: Format.currencySymbol,
+                            accessibilityLabel: "Price per \(units.volumeUnit)")
                     .focused($focus, equals: .rate)
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("Additional charge")
-                    Spacer(minLength: 8)
-                    AdjustmentKindPicker(kind: $estimate.surcharge.kind)
-                }
-                HStack(spacing: 12) {
-                    NumberField(placeholder: "0", value: $estimate.surcharge.amount,
-                                prefix: estimate.surcharge.kind == .fixed ? Format.currencySymbol : nil,
-                                suffix: estimate.surcharge.kind == .percent ? "%" : nil,
-                                alignment: .leading)
-                        .focused($focus, equals: .surchargeAmount)
-                        .frame(width: 96)
-                    Divider().frame(height: 22)
-                    TextField("Description, e.g. Stump grinding", text: $estimate.surchargeLabel)
-                        .font(.subheadline)
-                        .focused($focus, equals: .surchargeLabel)
-                }
-            }
-            .padding(.vertical, 2)
-
-            HStack {
-                Text("Discount")
-                Spacer(minLength: 8)
-                NumberField(placeholder: "0", value: $estimate.discount.amount,
-                            prefix: estimate.discount.kind == .fixed ? Format.currencySymbol : nil,
-                            suffix: estimate.discount.kind == .percent ? "%" : nil)
-                    .focused($focus, equals: .discount)
-                AdjustmentKindPicker(kind: $estimate.discount.kind)
-            }
+            surchargeRow
+            discountRow
 
             if !regionList.items.isEmpty {
                 LabeledContent("Tax region") {
@@ -247,9 +369,9 @@ struct EstimateEditorView: View {
                 }
             }
             LabeledContent("Tax rate") {
-                NumberField(placeholder: "0", value: $estimate.taxRate, suffix: "%")
+                NumberField(placeholder: "0", value: $estimate.taxRate, suffix: "%",
+                            accessibilityLabel: "Tax rate")
                     .focused($focus, equals: .tax)
-                    .id(taxFieldToken)
             }
         } header: {
             Text("Pricing")
@@ -258,11 +380,110 @@ struct EstimateEditorView: View {
         }
     }
 
+    private var surchargeRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Additional charge")
+                Spacer(minLength: 8)
+                AdjustmentKindPicker(kind: $estimate.surcharge.kind)
+                    .accessibilityLabel("Additional charge type")
+            }
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 10) { surchargeAmountField; surchargeDescription }
+            } else {
+                HStack(spacing: 12) {
+                    surchargeAmountField
+                    Divider().frame(height: 22)
+                    surchargeDescription
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var surchargeAmountField: some View {
+        NumberField(placeholder: "0", value: $estimate.surcharge.amount,
+                    prefix: estimate.surcharge.kind == .fixed ? Format.currencySymbol : nil,
+                    suffix: estimate.surcharge.kind == .percent ? "%" : nil,
+                    alignment: .leading,
+                    accessibilityLabel: "Additional charge amount")
+            .focused($focus, equals: .surchargeAmount)
+            .frame(minWidth: 72, maxWidth: typeSize.isAccessibilitySize ? .infinity : 130)
+    }
+
+    private var surchargeDescription: some View {
+        TextField("Description, e.g. Storm cleanup", text: $estimate.surchargeLabel)
+            .font(.subheadline)
+            .focused($focus, equals: .surchargeLabel)
+    }
+
+    private var discountRow: some View {
+        let kind = estimate.discount.kind
+        let field = NumberField(placeholder: "0", value: $estimate.discount.amount,
+                                prefix: kind == .fixed ? Format.currencySymbol : nil,
+                                suffix: kind == .percent ? "%" : nil,
+                                accessibilityLabel: "Discount amount")
+            .focused($focus, equals: .discount)
+        return Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Discount")
+                    field
+                    AdjustmentKindPicker(kind: $estimate.discount.kind)
+                        .accessibilityLabel("Discount type")
+                }
+            } else {
+                HStack {
+                    Text("Discount")
+                    Spacer(minLength: 8)
+                    field
+                    AdjustmentKindPicker(kind: $estimate.discount.kind)
+                        .accessibilityLabel("Discount type")
+                }
+            }
+        }
+    }
+
+    // MARK: - Payment
+
+    private var paymentSection: some View {
+        Section {
+            let kind = estimate.deposit.kind
+            LabeledContent("Deposit on acceptance") {
+                HStack(spacing: 8) {
+                    NumberField(placeholder: "0", value: $estimate.deposit.amount,
+                                prefix: kind == .fixed ? Format.currencySymbol : nil,
+                                suffix: kind == .percent ? "%" : nil,
+                                accessibilityLabel: "Deposit amount")
+                        .focused($focus, equals: .deposit)
+                    AdjustmentKindPicker(kind: $estimate.deposit.kind)
+                        .accessibilityLabel("Deposit type")
+                }
+            }
+            if estimate.status.isWon {
+                LabeledContent("Amount paid") {
+                    NumberField(placeholder: "0", value: $estimate.amountPaid, prefix: Format.currencySymbol,
+                                accessibilityLabel: "Amount paid")
+                        .focused($focus, equals: .amountPaid)
+                }
+            }
+        } header: {
+            Text("Payment")
+        } footer: {
+            Text("The deposit is shown on the estimate. The amount paid and the balance due are shown on the invoice.")
+        }
+    }
+
     // MARK: - Summary
 
     private var summarySection: some View {
         Section("Summary") {
-            summaryRow("Tree removal", detail: totals.volume > 0 ? "\(Format.volume(totals.volume, in: units)) × \(Format.money(estimate.ratePerUnit))" : nil, value: totals.volumeCost)
+            if totals.volume > 0 || estimate.lineItems.isEmpty {
+                summaryRow("Tree removal",
+                           detail: totals.volume > 0 ? "\(Format.volume(totals.volume, in: units)) × \(Format.unitPrice(estimate.ratePerUnit))" : nil,
+                           value: totals.volumeCost)
+            }
+            otherWorkSummary
             if totals.startingFee > 0 {
                 summaryRow("Starting fee", value: totals.startingFee)
             }
@@ -289,7 +510,35 @@ struct EstimateEditorView: View {
                     .contentTransition(.numericText())
             }
             .accessibilityElement(children: .combine)
+            if totals.deposit > 0 {
+                summaryRow("Deposit due on acceptance", value: totals.deposit, color: .secondary)
+            }
+            if estimate.status.isWon && totals.paid > 0 {
+                summaryRow("Paid", value: -totals.paid, color: .secondary)
+                summaryRow("Balance due", value: totals.balanceDue, bold: true)
+            }
         }
+    }
+
+    @ViewBuilder
+    private var otherWorkSummary: some View {
+        let priced = estimate.lineItems.filter { $0.amount > 0 }
+        if totals.lineItems > 0 {
+            if priced.count <= 4 {
+                ForEach(priced) { item in
+                    summaryRow(item.displayName, detail: lineItemDetail(item), value: item.amount)
+                }
+            } else {
+                summaryRow("Other work", detail: "\(priced.count) items", value: totals.lineItems)
+            }
+        }
+    }
+
+    private func lineItemDetail(_ item: LineItem) -> String {
+        let unit = item.unit.trimmed
+        let quantity = Format.number(item.quantity) + (unit.isEmpty ? "" : " \(unit)")
+        let base = "\(quantity) × \(Format.unitPrice(item.unitPrice))"
+        return item.usesMinimum ? "\(base), minimum charge" : base
     }
 
     private func summaryRow(_ title: String, detail: String? = nil, value: Double, bold: Bool = false, color: Color = .primary) -> some View {
@@ -309,6 +558,64 @@ struct EstimateEditorView: View {
         .accessibilityElement(children: .combine)
     }
 
+    // MARK: - Signature
+
+    private var signatureSection: some View {
+        Section {
+            if let id = estimate.signatureID {
+                SignaturePreview(id: id)
+                Text(signedCaption)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Button("Clear Signature", role: .destructive) { clearSignature(id) }
+            } else {
+                Button {
+                    focus = nil
+                    showSignature = true
+                } label: {
+                    Label("Get Customer Signature", systemImage: "signature")
+                }
+                .disabled(!estimate.hasBillableWork)
+                .accessibilityHint(estimate.hasBillableWork ? "Hand the phone to your customer to sign" : "Add the work and prices first")
+            }
+        } header: {
+            Text("Customer Signature")
+        } footer: {
+            Text("Hand the phone to your customer to sign that they accept the estimate. The signature is printed on the PDF.")
+        }
+    }
+
+    private var signedCaption: String {
+        let name = estimate.signedName.trimmed
+        let who = name.isEmpty ? "Signed" : "Signed by \(name)"
+        guard let date = estimate.signedAt else { return who }
+        return "\(who) on \(date.formatted(date: .abbreviated, time: .omitted))"
+    }
+
+    private func saveSignature(_ png: Data, name: String) {
+        guard let id = PhotoStore.save(png) else { return }
+        let old = estimate.signatureID
+        estimate.signatureID = id
+        estimate.signedName = name
+        estimate.signedAt = Date()
+        if estimate.status == .draft || estimate.status == .sent { estimate.status = .approved }
+        if let old { persistThenDelete([old]) }
+    }
+
+    private func clearSignature(_ id: UUID) {
+        estimate.signatureID = nil
+        estimate.signedName = ""
+        estimate.signedAt = nil
+        persistThenDelete([id])
+    }
+
+    /// Writes the estimate to disk first so a crash can never leave it pointing at a deleted file.
+    private func persistThenDelete(_ ids: [UUID]) {
+        store.update(estimate)
+        store.flush()
+        Task.detached(priority: .utility) { PhotoStore.delete(ids) }
+    }
+
     // MARK: - Notes
 
     private var notesSection: some View {
@@ -326,33 +633,19 @@ struct EstimateEditorView: View {
     // MARK: - Bars & menus
 
     private var bottomBar: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Total")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                Text(Format.money(totals.total))
-                    .font(.system(.title2, design: .rounded, weight: .bold))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .contentTransition(.numericText())
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 10) {
+                    totalLabel
+                    shareButton.frame(maxWidth: .infinity)
+                }
+            } else {
+                HStack(spacing: 16) {
+                    totalLabel
+                    Spacer(minLength: 8)
+                    shareButton
+                }
             }
-            .accessibilityElement(children: .combine)
-
-            Spacer(minLength: 8)
-
-            Button {
-                showPreview = true
-            } label: {
-                Label("Preview & Share", systemImage: "square.and.arrow.up")
-                    .font(.body.weight(.semibold))
-            }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.capsule)
-            .controlSize(.large)
-            .disabled(!estimate.hasMeasuredTree)
-            .accessibilityHint(estimate.hasMeasuredTree ? "Creates a PDF you can send to the customer" : "Enter a tree's measurements first")
         }
         .frame(maxWidth: 720 - 40)
         .padding(.horizontal, 20)
@@ -360,6 +653,39 @@ struct EstimateEditorView: View {
         .frame(maxWidth: .infinity)
         .background(.bar)
         .overlay(alignment: .top) { Divider() }
+    }
+
+    private var totalLabel: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text("Total")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+            Text(Format.money(totals.total))
+                .font(.system(.title2, design: .rounded, weight: .bold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .contentTransition(.numericText())
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var shareButton: some View {
+        Button {
+            showPreview = true
+        } label: {
+            Label(estimate.status.isInvoice ? "Invoice & Share" : "Preview & Share", systemImage: "square.and.arrow.up")
+                .font(.body.weight(.semibold))
+                .lineLimit(1)
+                // Keep the label on one line; the total shrinks to fit instead.
+                .fixedSize(horizontal: !typeSize.isAccessibilitySize, vertical: false)
+        }
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.capsule)
+        .controlSize(.large)
+        .layoutPriority(1)
+        .disabled(!estimate.hasBillableWork)
+        .accessibilityHint(estimate.hasBillableWork ? "Creates a PDF you can send to the customer" : "Enter a tree's measurements or add other work first")
     }
 
     @ViewBuilder
@@ -387,6 +713,22 @@ struct EstimateEditorView: View {
                     Label(status.title, systemImage: status.symbol).tag(status)
                 }
             }
+            if [.draft, .sent, .approved].contains(estimate.status) {
+                Button {
+                    estimate.status = .invoiced
+                    if estimate.invoiceDate == nil { estimate.invoiceDate = Date() }
+                } label: {
+                    Label("Create Invoice", systemImage: "doc.text")
+                }
+            }
+            if estimate.status == .invoiced {
+                Button {
+                    estimate.status = .paid
+                    estimate.amountPaid = totals.total
+                } label: {
+                    Label("Mark as Paid", systemImage: "checkmark.circle")
+                }
+            }
             Divider()
             Button(role: .destructive) { confirmDelete = true } label: {
                 Label("Delete Estimate", systemImage: "trash")
@@ -406,7 +748,12 @@ struct EstimateEditorView: View {
         for tree in estimate.trees {
             order += [.label(tree.id), .circumference(tree.id), .height(tree.id)]
         }
-        order += [.name, .phone, .email, .address, .fee, .rate, .surchargeAmount, .surchargeLabel, .discount, .tax]
+        for item in estimate.lineItems {
+            order += [.itemName(item.id), .itemQuantity(item.id), .itemPrice(item.id)]
+        }
+        order += [.name, .phone, .email, .address, .fee, .rate, .surchargeAmount, .surchargeLabel, .discount, .tax, .deposit]
+        if estimate.status.isWon { order.append(.amountPaid) }
+        order.append(.notes)
         return order
     }
 
@@ -433,7 +780,6 @@ struct EstimateEditorView: View {
         estimate.regionRate = region.rate
         let regionLicense = region.license.trimmed
         estimate.licenseNumber = regionLicense.isEmpty ? defaultLicense : regionLicense
-        taxFieldToken = UUID()
     }
 
     private func useDefaultTax() {
@@ -441,7 +787,6 @@ struct EstimateEditorView: View {
         estimate.regionName = ""
         estimate.regionRate = 0
         estimate.licenseNumber = defaultLicense
-        taxFieldToken = UUID()
     }
 
     private var defaultLicense: String {
@@ -486,15 +831,14 @@ struct EstimateEditorView: View {
         let source = estimate.trees[index]
         let copy = TreeItem(label: source.label, circumference: source.circumference, height: source.height)
         withAnimation { estimate.trees.insert(copy, at: index + 1) }
+        Task { await focusWhenReady(.circumference(copy.id), firstDelay: 250) }
     }
 
     private func deleteTree(_ id: UUID) {
         guard let index = estimate.trees.firstIndex(where: { $0.id == id }) else { return }
         let photos = estimate.trees[index].photoIDs
         withAnimation { _ = estimate.trees.remove(at: index) }
-        if !photos.isEmpty {
-            Task.detached(priority: .utility) { PhotoStore.delete(photos) }
-        }
+        if !photos.isEmpty { persistThenDelete(photos) }
     }
 }
 
@@ -507,6 +851,9 @@ struct TreeRow: View {
     var focus: FocusState<EditorField?>.Binding
     let onDuplicate: () -> Void
     let onDelete: () -> Void
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var showHeightMeasure = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -525,6 +872,7 @@ struct TreeRow: View {
                 Spacer()
                 Menu {
                     Button(action: onDuplicate) { Label("Duplicate", systemImage: "plus.square.on.square") }
+                    Button { showHeightMeasure = true } label: { Label("Measure Height…", systemImage: "angle") }
                     Button(role: .destructive, action: onDelete) { Label("Delete Tree", systemImage: "trash") }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -540,18 +888,76 @@ struct TreeRow: View {
                 .font(.subheadline)
                 .focused(focus, equals: .label(tree.id))
 
-            HStack(spacing: 12) {
-                MeasurementField(title: "Circumference", unit: units.lengthUnit, value: $tree.circumference,
-                                 isFocused: focus.wrappedValue == .circumference(tree.id))
-                    .focused(focus, equals: .circumference(tree.id))
-                MeasurementField(title: "Height", unit: units.lengthUnit, value: $tree.height,
-                                 isFocused: focus.wrappedValue == .height(tree.id))
-                    .focused(focus, equals: .height(tree.id))
+            if typeSize.isAccessibilitySize {
+                VStack(spacing: 12) { circumferenceField; heightField }
+            } else {
+                HStack(spacing: 12) { circumferenceField; heightField }
             }
+
+            if let diameter = diameterText {
+                Text(diameter)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button { showHeightMeasure = true } label: {
+                Label("Measure Height…", systemImage: "angle")
+                    .font(.subheadline)
+            }
+            .accessibilityHint("Uses the camera tilt to estimate the tree's height")
 
             PhotoAttachments(ids: $tree.photoIDs)
         }
         .padding(.vertical, 6)
         .buttonStyle(.borderless)
+        .sheet(isPresented: $showHeightMeasure) {
+            HeightMeasureSheet(units: units, onUse: { tree.height = $0 })
+        }
+    }
+
+    private var circumferenceField: some View {
+        MeasurementField(title: "Circumference", unit: units.lengthUnit, value: $tree.circumference,
+                         isFocused: focus.wrappedValue == .circumference(tree.id))
+            .focused(focus, equals: .circumference(tree.id))
+    }
+
+    private var heightField: some View {
+        MeasurementField(title: "Height", unit: units.lengthUnit, value: $tree.height,
+                         isFocused: focus.wrappedValue == .height(tree.id))
+            .focused(focus, equals: .height(tree.id))
+    }
+
+    /// Trunk diameter (what arborists call DBH) from the circumference: ft to inches, or m to cm.
+    private var diameterText: String? {
+        guard tree.circumference > 0 else { return nil }
+        let diameter = tree.circumference / Double.pi
+        return units == .imperial
+            ? "Diameter ≈ \(Format.number(diameter * 12)) in"
+            : "Diameter ≈ \(Format.number(diameter * 100)) cm"
+    }
+}
+
+/// The saved signature picture, loaded off the main thread.
+private struct SignaturePreview: View {
+    let id: UUID
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: 120)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .accessibilityLabel("Customer signature")
+            } else {
+                ProgressView().frame(maxWidth: .infinity, minHeight: 60)
+            }
+        }
+        .task(id: id) {
+            let target = id
+            image = await Task.detached { PhotoStore.image(for: target, maxPixel: 800) }.value
+        }
     }
 }

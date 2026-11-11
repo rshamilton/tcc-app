@@ -31,8 +31,11 @@ final class EstimateStore: ObservableObject {
         estimates.first { $0.id == id }
     }
 
-    var openEstimates: [Estimate] { estimates.filter { $0.status.isOpen && $0.hasMeasuredTree } }
-    var approvedEstimates: [Estimate] { estimates.filter { $0.status == .approved } }
+    var openEstimates: [Estimate] { estimates.filter { $0.status.isOpen && $0.hasBillableWork } }
+    /// Approved, invoiced and paid work.
+    var approvedEstimates: [Estimate] { estimates.filter { $0.status.isWon } }
+    /// Invoices not yet paid in full.
+    var unpaidInvoices: [Estimate] { estimates.filter { $0.status == .invoiced && $0.totals.balanceDue > 0 } }
 
     // MARK: Changes
 
@@ -91,6 +94,12 @@ final class EstimateStore: ObservableObject {
         copy.updatedAt = Date()
         copy.sitePhotoIDs = []
         copy.trees = copy.trees.map { TreeItem(label: $0.label, circumference: $0.circumference, height: $0.height) }
+        copy.lineItems = copy.lineItems.map { var item = $0; item.id = UUID(); return item }
+        copy.amountPaid = 0
+        copy.invoiceDate = nil
+        copy.signatureID = nil
+        copy.signedName = ""
+        copy.signedAt = nil
         estimates.insert(copy, at: 0)
         markDirty(copy.id)
         return copy
@@ -167,14 +176,31 @@ final class EstimateStore: ObservableObject {
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        let urls = (try? FileManager.default.contentsOfDirectory(at: DataFolder.estimates, includingPropertiesForKeys: nil)) ?? []
+        let listed = try? FileManager.default.contentsOfDirectory(at: DataFolder.estimates, includingPropertiesForKeys: nil)
         var loaded: [Estimate] = []
-        for url in urls where url.pathExtension == "json" {
+        // Photos of an estimate we can't read must not be treated as orphans and deleted.
+        var protectedPhotos = Set<UUID>()
+        var canPurge = listed != nil
+        for url in listed ?? [] where url.pathExtension == "json" {
             // A file we can't read is left alone rather than overwritten or deleted.
             if let data = try? Data(contentsOf: url), let estimate = try? decoder.decode(Estimate.self, from: data) {
                 loaded.append(estimate)
             } else {
                 print("EstimateStore: skipping unreadable file \(url.lastPathComponent)")
+                if let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8) {
+                    protectedPhotos.formUnion(Self.uuids(in: text))
+                } else {
+                    canPurge = false
+                }
+            }
+        }
+        // Keep edits that couldn't be saved yet (e.g. disk full) instead of replacing them with the
+        // older copy on disk, or dropping a new estimate that has no file at all.
+        for pending in estimates where dirty.contains(pending.id) {
+            if let index = loaded.firstIndex(where: { $0.id == pending.id }) {
+                if pending.updatedAt > loaded[index].updatedAt { loaded[index] = pending } else { dirty.remove(pending.id) }
+            } else {
+                loaded.append(pending)
             }
         }
         estimates = loaded
@@ -188,12 +214,47 @@ final class EstimateStore: ObservableObject {
         }
 
         migrateLegacyDataIfNeeded()
-        purgeOrphanedPhotos()
+        if canPurge { purgeOrphanedPhotos(alsoKeeping: protectedPhotos) }
     }
 
-    private func purgeOrphanedPhotos() {
-        let referenced = Set(estimates.flatMap(\.allPhotoIDs))
+    private func purgeOrphanedPhotos(alsoKeeping extra: Set<UUID>) {
+        let referenced = Set(estimates.flatMap(\.allPhotoIDs)).union(extra)
         Task.detached(priority: .utility) { PhotoStore.purge(keeping: referenced) }
+    }
+
+    /// Every UUID mentioned in a piece of text (used to protect the photos of an unreadable estimate file).
+    nonisolated static func uuids(in text: String) -> Set<UUID> {
+        let pattern = /[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/
+        return Set(text.matches(of: pattern).compactMap { UUID(uuidString: String($0.output)) })
+    }
+
+    // MARK: Export
+
+    /// All estimates as a CSV spreadsheet (one row per estimate), newest first.
+    func csv() -> String {
+        func field(_ value: String) -> String {
+            let needsQuotes = value.contains(where: { $0 == "," || $0 == "\"" || $0 == "\n" || $0 == "\r" })
+            let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
+            return needsQuotes ? "\"\(escaped)\"" : escaped
+        }
+        func amount(_ value: Double) -> String { String(format: "%.2f", value) }
+        let header = ["Number", "Status", "Created", "Updated", "Customer", "Phone", "Email", "Job site",
+                      "Trees", "Volume", "Volume unit", "Starting fee", "Tree removal", "Other work",
+                      "Additional charge", "Discount", "Tax rate %", "Tax", "Total", "Paid", "Balance due", "Notes"]
+        let dates = ISO8601DateFormatter()
+        dates.formatOptions = [.withFullDate]
+        var rows = [header.joined(separator: ",")]
+        for e in sortedEstimates {
+            let t = e.totals
+            let row = [e.documentLabel, e.status.title, dates.string(from: e.createdAt), dates.string(from: e.updatedAt),
+                       e.customerName, e.customerPhone, e.customerEmail, e.address,
+                       String(e.measuredTreeCount), String(format: "%.2f", t.volume), e.unitSystem.volumeUnit,
+                       amount(t.startingFee), amount(t.volumeCost), amount(t.lineItems), amount(t.surcharge),
+                       amount(t.discount), String(e.taxRate), amount(t.tax), amount(t.total), amount(t.paid),
+                       amount(t.balanceDue), e.notes]
+            rows.append(row.map(field).joined(separator: ","))
+        }
+        return rows.joined(separator: "\r\n") + "\r\n"
     }
 
     // MARK: Older versions

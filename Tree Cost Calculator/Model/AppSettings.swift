@@ -30,6 +30,18 @@ nonisolated enum SettingsKey {
     static let lastBackup = "lastBackupDate"
     /// Whether this device keeps the backup's settings and logo up to date (see `LaunchCoordinator`).
     static let backupLinked = "backupLinkedToThisDevice"
+
+    /// Saved services price list (`ServiceList` JSON).
+    static let services = "serviceList"
+    /// Days after the invoice date that payment is due (0 = due on receipt).
+    static let invoiceDueDays = "invoiceDueDays"
+    /// Payment instructions printed on invoices (bank details, accepted payment methods…).
+    static let paymentInstructions = "paymentInstructions"
+
+    // Review prompt bookkeeping (device-only; not copied to Settings.json).
+    static let sharedCount = "sharedDocumentCount"
+    static let firstUse = "firstUseDate"
+    static let reviewRequestedVersion = "reviewRequestedForVersion"
 }
 
 enum AppDefaults {
@@ -52,12 +64,15 @@ enum AppDefaults {
             SettingsKey.iCloudBackup: true,
             SettingsKey.validDays: 30,
             SettingsKey.terms: defaultTerms,
-            SettingsKey.nextNumber: 1
+            SettingsKey.nextNumber: 1,
+            SettingsKey.services: ServiceList(items: ServiceList.starter).rawValue,
+            SettingsKey.invoiceDueDays: 14,
+            SettingsKey.paymentInstructions: ""
     ]
 }
 
 /// Snapshot of the business details printed on every estimate.
-struct BusinessProfile {
+nonisolated struct BusinessProfile: Sendable {
     var name: String
     var phone: String
     var email: String
@@ -66,6 +81,8 @@ struct BusinessProfile {
     var validDays: Int
     var includePhotos: Bool
     var itemizeTrees: Bool
+    var invoiceDueDays: Int
+    var paymentInstructions: String
 
     static func current() -> BusinessProfile {
         let d = UserDefaults.standard
@@ -77,7 +94,9 @@ struct BusinessProfile {
             terms: (d.string(forKey: SettingsKey.terms) ?? "").trimmed,
             validDays: d.integer(forKey: SettingsKey.validDays),
             includePhotos: d.bool(forKey: SettingsKey.includePhotos),
-            itemizeTrees: d.bool(forKey: SettingsKey.itemizeTrees)
+            itemizeTrees: d.bool(forKey: SettingsKey.itemizeTrees),
+            invoiceDueDays: d.integer(forKey: SettingsKey.invoiceDueDays),
+            paymentInstructions: (d.string(forKey: SettingsKey.paymentInstructions) ?? "").trimmed
         )
     }
 }

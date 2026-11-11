@@ -66,7 +66,9 @@ nonisolated enum LegacyMigration {
         guard let quotesData else { return [] }
         let decoder = JSONDecoder()
         // Swift's default Date strategy (seconds since 2001) is what the old version wrote.
-        guard let quotes = try? decoder.decode([LegacyQuote].self, from: quotesData) else { return [] }
+        // Decoded one by one, so a single damaged quote doesn't lose all the others.
+        guard let raw = try? decoder.decode([LossyDecodable<LegacyQuote>].self, from: quotesData) else { return [] }
+        let quotes = raw.compactMap(\.value)
         var history = (historyData.flatMap { try? decoder.decode([LegacyHistoryEntry].self, from: $0) }) ?? []
 
         let useMetric = UserDefaults.standard.bool(forKey: SettingsKey.useMetric)
@@ -80,9 +82,11 @@ nonisolated enum LegacyMigration {
             e.createdAt = quote.date
             e.updatedAt = quote.lastModified ?? quote.date
             e.unitSystem = useMetric ? .metric : .imperial
-            e.startingFee = quote.startingFee ?? 0
-            e.ratePerUnit = quote.pricePerCubicFoot ?? 0
-            e.taxRate = taxWasEnabled ? (quote.taxRate ?? 0) : 0
+            // Early quotes didn't store their own prices: they used the global settings, which are still saved.
+            let defaults = UserDefaults.standard
+            e.startingFee = quote.startingFee ?? defaults.double(forKey: SettingsKey.startingFee)
+            e.ratePerUnit = quote.pricePerCubicFoot ?? defaults.double(forKey: SettingsKey.ratePerUnit)
+            e.taxRate = taxWasEnabled ? (quote.taxRate ?? defaults.double(forKey: SettingsKey.taxRate)) : 0
 
             e.discount = Adjustment(amount: quote.discountAmount ?? 0, kind: quote.discountType == "fixed" ? .fixed : .percent)
             e.surcharge = Adjustment(amount: quote.additionalChargeAmount ?? 0, kind: quote.additionalChargeType == "percentage" ? .percent : .fixed)
@@ -127,5 +131,13 @@ nonisolated enum LegacyMigration {
             }
             return e
         }
+    }
+}
+
+/// Decodes an element if it can, or nil instead of failing the whole array.
+nonisolated struct LossyDecodable<T: Decodable>: Decodable {
+    let value: T?
+    init(from decoder: Decoder) throws {
+        value = try? T(from: decoder)
     }
 }

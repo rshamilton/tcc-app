@@ -185,6 +185,25 @@ nonisolated enum DebugLaunch {
         first.licenseNumber = "TX-TCLB-90211"
         first.notes = "Customer wants the wood left on site."
         finish(first, created: ago(hours: 5), updated: ago(hours: 2))
+
+        // -invoiceDemo: an approved job turned into a part-paid invoice with other work (for checking the invoice PDF).
+        if has("-invoiceDemo") {
+            var invoice = store.createEstimate()
+            invoice.customerName = "Dana Whitfield"
+            invoice.address = "5 Elm Row, Springfield"
+            invoice.trees = [TreeItem(label: "Dead white ash", circumference: 5.0, height: 48)]
+            invoice.lineItems = [
+                LineItem(name: "Stump grinding", quantity: 22, unit: "in", unitPrice: 3, minimum: 100),
+                LineItem(name: "Haul away debris", quantity: 2, unit: "load", unitPrice: 85)
+            ]
+            invoice.deposit = Adjustment(amount: 25, kind: .percent)
+            invoice.status = .approved
+            invoice.status = .invoiced
+            invoice.amountPaid = 500
+            invoice.notes = "Thank you for your business."
+            finish(invoice, created: ago(days: 1), updated: ago(hours: 1))
+            UserDefaults.standard.set("Check payable to Oakridge Tree Service, or card on site.", forKey: SettingsKey.paymentInstructions)
+        }
         store.flush()
     }
 }

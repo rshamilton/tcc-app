@@ -4,8 +4,10 @@
 //
 
 import UIKit
+import CoreText
 
-/// Lays out a customer-facing estimate as a multi-page PDF (Letter in the US, A4 elsewhere).
+/// Lays out a customer-facing estimate or invoice as a multi-page PDF (Letter in North America, A4 elsewhere).
+/// Stays on the main actor because `Format` is main-actor isolated.
 final class EstimatePDF {
     private let estimate: Estimate
     private let business: BusinessProfile
@@ -20,6 +22,10 @@ final class EstimatePDF {
     private var y: CGFloat = 0
     private var pageNumber = 0
     private var totalPages: Int?
+    /// True during the page-counting pass: photos are drawn as placeholders so they are only decoded once.
+    private var skipImages = false
+
+    private var isInvoice: Bool { estimate.status.isInvoice }
 
     private var contentWidth: CGFloat { pageRect.width - margin * 2 }
     private var bottomLimit: CGFloat { pageRect.height - margin - footerHeight }
@@ -38,13 +44,17 @@ final class EstimatePDF {
         self.business = business
         self.logo = logo
         self.totals = estimate.totals
-        let usesLetter = Locale.current.measurementSystem == .us
+        // Letter paper is used across the Americas (and the Philippines); everywhere else uses A4.
+        let letterRegions: Set<String> = ["US", "CA", "MX", "PR", "PH", "CL", "CO", "VE", "GT", "CR", "PA", "DO", "SV", "NI", "BO"]
+        let usesLetter = Locale.current.region.map { letterRegions.contains($0.identifier) } ?? false
         self.pageRect = usesLetter ? CGRect(x: 0, y: 0, width: 612, height: 792) : CGRect(x: 0, y: 0, width: 595, height: 842)
     }
 
     /// Renders the PDF. Two passes: the first counts pages so the footer can say "Page 1 of 3".
     func render() -> Data {
+        skipImages = true
         let (_, count) = draw(totalPages: nil)
+        skipImages = false
         return draw(totalPages: count).data
     }
 
@@ -56,7 +66,7 @@ final class EstimatePDF {
 
         let format = UIGraphicsPDFRendererFormat()
         format.documentInfo = [
-            kCGPDFContextTitle as String: "Estimate \(estimate.numberLabel)",
+            kCGPDFContextTitle as String: "\(isInvoice ? "Invoice" : "Estimate") \(estimate.documentLabel)",
             kCGPDFContextCreator as String: "Tree Cost Calculator",
             kCGPDFContextAuthor as String: business.name.isEmpty ? "Tree Cost Calculator" : business.name
         ]
@@ -67,10 +77,12 @@ final class EstimatePDF {
             drawHeader()
             drawParties()
             drawTrees()
+            drawLineItems()
             drawTotals()
+            drawPayment()
             drawNotes()
             drawTerms()
-            drawAcceptance()
+            if isInvoice { drawAcceptedLine() } else { drawAcceptance() }
             drawPhotos()
             drawFooter()
         }
@@ -125,12 +137,23 @@ final class EstimatePDF {
         // Right column
         let rightX = pageRect.width - margin - rightWidth
         var rightY = y
-        rightY += drawText("ESTIMATE", x: rightX, y: rightY, width: rightWidth, font: .systemFont(ofSize: 24, weight: .heavy), color: brand, align: .right, kern: 1.5) + 2
-        rightY += drawText(estimate.numberLabel, x: rightX, y: rightY, width: rightWidth, font: .systemFont(ofSize: 11, weight: .semibold), color: ink, align: .right) + 6
-        let date = estimate.createdAt.formatted(date: .long, time: .omitted)
-        rightY += drawText("Date: \(date)", x: rightX, y: rightY, width: rightWidth, font: .systemFont(ofSize: 9.5), color: muted, align: .right) + 2
-        if business.validDays > 0, let until = Calendar.current.date(byAdding: .day, value: business.validDays, to: estimate.createdAt) {
-            rightY += drawText("Valid until: \(until.formatted(date: .long, time: .omitted))", x: rightX, y: rightY, width: rightWidth, font: .systemFont(ofSize: 9.5), color: muted, align: .right)
+        let smallFont = UIFont.systemFont(ofSize: 9.5)
+        rightY += drawText(isInvoice ? "INVOICE" : "ESTIMATE", x: rightX, y: rightY, width: rightWidth, font: .systemFont(ofSize: 24, weight: .heavy), color: brand, align: .right, kern: 1.5) + 2
+        rightY += drawText(estimate.documentLabel, x: rightX, y: rightY, width: rightWidth, font: .systemFont(ofSize: 11, weight: .semibold), color: ink, align: .right) + 6
+        if isInvoice {
+            let invoiceDate = estimate.invoiceDate ?? estimate.updatedAt
+            rightY += drawText("Invoice date: \(invoiceDate.formatted(date: .long, time: .omitted))", x: rightX, y: rightY, width: rightWidth, font: smallFont, color: muted, align: .right) + 2
+            if business.invoiceDueDays > 0, let due = Calendar.current.date(byAdding: .day, value: business.invoiceDueDays, to: invoiceDate) {
+                rightY += drawText("Payment due: \(due.formatted(date: .long, time: .omitted))", x: rightX, y: rightY, width: rightWidth, font: .systemFont(ofSize: 9.5, weight: .semibold), color: ink, align: .right)
+            } else {
+                rightY += drawText("Due on receipt", x: rightX, y: rightY, width: rightWidth, font: .systemFont(ofSize: 9.5, weight: .semibold), color: ink, align: .right)
+            }
+        } else {
+            let date = estimate.createdAt.formatted(date: .long, time: .omitted)
+            rightY += drawText("Date: \(date)", x: rightX, y: rightY, width: rightWidth, font: smallFont, color: muted, align: .right) + 2
+            if business.validDays > 0, let until = Calendar.current.date(byAdding: .day, value: business.validDays, to: estimate.createdAt) {
+                rightY += drawText("Valid until: \(until.formatted(date: .long, time: .omitted))", x: rightX, y: rightY, width: rightWidth, font: smallFont, color: muted, align: .right)
+            }
         }
 
         y += max(leftHeight, rightY - y) + 14
@@ -236,14 +259,64 @@ final class EstimatePDF {
         y += 30
     }
 
+    private func drawLineItems() {
+        let items = estimate.lineItems.filter { $0.amount > 0 }
+        guard !items.isEmpty else { return }
+
+        drawSectionTitle("OTHER WORK")
+
+        let qtyW: CGFloat = 96, priceW: CGFloat = 84, amountW: CGFloat = 86
+        let descW = contentWidth - qtyW - priceW - amountW - 8
+        let descX = margin + 8
+        let qtyX = descX + descW
+        let priceX = qtyX + qtyW
+        let amountX = priceX + priceW
+
+        func headerRow() {
+            fill(CGRect(x: margin, y: y, width: contentWidth, height: 22), color: tint, radius: 5)
+            let font = UIFont.systemFont(ofSize: 8, weight: .bold)
+            drawText("DESCRIPTION", x: descX, y: y + 7, width: descW, font: font, color: muted, kern: 0.6)
+            drawText("QUANTITY", x: qtyX, y: y + 7, width: qtyW, font: font, color: muted, align: .right, kern: 0.6)
+            drawText("UNIT PRICE", x: priceX, y: y + 7, width: priceW, font: font, color: muted, align: .right, kern: 0.6)
+            drawText("AMOUNT", x: amountX, y: y + 7, width: amountW - 8, font: font, color: muted, align: .right, kern: 0.6)
+            y += 26
+        }
+
+        ensureSpace(60)
+        headerRow()
+
+        let font = UIFont.systemFont(ofSize: 10)
+        for (offset, item) in items.enumerated() {
+            let description = item.displayName + (item.usesMinimum ? " (minimum charge)" : "")
+            let quantity = Format.number(item.quantity) + (item.unit.trimmed.isEmpty ? "" : " " + item.unit.trimmed)
+            let textHeight = max(measure(description, width: descW - 8, font: font), measure(quantity, width: qtyW - 8, font: font))
+            let rowHeight = max(24, textHeight + 12)
+            if y + rowHeight > bottomLimit {
+                newPage()
+                headerRow()
+            }
+            if offset % 2 == 1 {
+                fill(CGRect(x: margin, y: y, width: contentWidth, height: rowHeight), color: tint.withAlphaComponent(0.55), radius: 4)
+            }
+            drawText(description, x: descX, y: y + 6, width: descW - 8, font: font, color: ink)
+            drawText(quantity, x: qtyX, y: y + 6, width: qtyW - 8, font: font, color: ink, align: .right)
+            drawText(Format.unitPrice(item.unitPrice), x: priceX, y: y + 6, width: priceW - 8, font: font, color: ink, align: .right)
+            drawText(Format.money(item.amount), x: amountX, y: y + 6, width: amountW - 8, font: .systemFont(ofSize: 10, weight: .semibold), color: ink, align: .right)
+            y += rowHeight
+        }
+        y += 6
+        line(from: CGPoint(x: margin, y: y), to: CGPoint(x: pageRect.width - margin, y: y))
+        y += 22
+    }
+
     private func drawTotals() {
         // Build the lines first so we know how tall the block is.
         var rows: [(label: String, value: String, style: RowStyle)] = []
-        let volumeLabel = totals.volume > 0
-            ? "Tree removal (\(Format.volume(totals.volume, in: units)) × \(Format.money(estimate.ratePerUnit)))"
-            : "Tree removal"
-        rows.append((volumeLabel, Format.money(totals.volumeCost), .normal))
+        if totals.volume > 0 {
+            rows.append(("Tree removal (\(Format.volume(totals.volume, in: units)) × \(Format.unitPrice(estimate.ratePerUnit)))", Format.money(totals.volumeCost), .normal))
+        }
         if totals.startingFee > 0 { rows.append(("Starting fee", Format.money(totals.startingFee), .normal)) }
+        if totals.lineItems > 0 { rows.append(("Other work", Format.money(totals.lineItems), .normal)) }
         if totals.surcharge > 0 {
             let label = estimate.surchargeLabel.trimmed.isEmpty ? "Additional charge" : estimate.surchargeLabel.trimmed
             rows.append((label, Format.money(totals.surcharge), .normal))
@@ -262,7 +335,12 @@ final class EstimatePDF {
         let font = UIFont.systemFont(ofSize: 10.5)
 
         let rowHeights = rows.map { max(18, measure($0.label, width: labelWidth, font: font) + 6) }
-        let needed = rowHeights.reduce(0, +) + 60
+        let isPaid = estimate.status == .paid
+        let paidAmount = isPaid ? max(totals.paid, totals.total) : totals.paid
+        let balance = isPaid ? 0 : max(0, totals.balanceDue)
+        var needed = rowHeights.reduce(0, +) + 60
+        if isInvoice { needed += 64 + (paidAmount > 0 ? 24 : 0) }
+        else if totals.deposit > 0 { needed += 24 }
         ensureSpace(needed)
 
         for (index, row) in rows.enumerated() {
@@ -279,55 +357,139 @@ final class EstimatePDF {
         fill(totalRect, color: brand, radius: 9)
         drawText("TOTAL", x: blockX + 14, y: y + 12, width: 100, font: .systemFont(ofSize: 11, weight: .bold), color: .white, kern: 1.2)
         drawText(Format.money(totals.total), x: blockX + blockWidth - 190 - 14, y: y + 9, width: 190, font: .systemFont(ofSize: 17, weight: .heavy), color: .white, align: .right)
-        y += 38 + 26
+        let totalY = y
+        y += 38
+
+        if isInvoice {
+            y += 10
+            if paidAmount > 0 {
+                drawText("Amount paid", x: blockX, y: y + 2, width: labelWidth, font: font, color: muted)
+                drawText("−" + Format.money(paidAmount), x: blockX + blockWidth - valueWidth, y: y + 2, width: valueWidth, font: font, color: ink, align: .right)
+                y += 24
+            }
+            // Highlighted box (outlined rather than filled so it reads as "what's left to pay").
+            let balanceRect = CGRect(x: blockX, y: y, width: blockWidth, height: 38)
+            fill(balanceRect, color: tint, radius: 9)
+            let outline = UIBezierPath(roundedRect: balanceRect.insetBy(dx: 0.75, dy: 0.75), cornerRadius: 9)
+            outline.lineWidth = 1.5
+            brand.setStroke()
+            outline.stroke()
+            drawText("BALANCE DUE", x: blockX + 14, y: y + 12, width: 120, font: .systemFont(ofSize: 11, weight: .bold), color: brand, kern: 1.2)
+            drawText(Format.money(balance), x: blockX + blockWidth - 190 - 14, y: y + 9, width: 190, font: .systemFont(ofSize: 17, weight: .heavy), color: brand, align: .right)
+            if isPaid { drawPaidStamp(centeredAt: CGPoint(x: margin + 70, y: (totalY + y + 38) / 2)) }
+            y += 38 + 26
+        } else if totals.deposit > 0 {
+            y += 10
+            var text = "Deposit due on acceptance: \(Format.money(totals.deposit))"
+            if estimate.deposit.kind == .percent, estimate.deposit.amount > 0 { text += " (\(Format.percent(estimate.deposit.amount)))" }
+            drawText(text, x: blockX, y: y, width: blockWidth, font: .systemFont(ofSize: 10.5, weight: .semibold), color: ink, align: .right)
+            y += 14 + 26
+        } else {
+            y += 26
+        }
+    }
+
+    /// A tilted "PAID" mark in the brand colour, like a rubber stamp.
+    private func drawPaidStamp(centeredAt center: CGPoint) {
+        let cg = context.cgContext
+        cg.saveGState()
+        cg.translateBy(x: center.x, y: center.y)
+        cg.rotate(by: -8 * .pi / 180)
+        let rect = CGRect(x: -52, y: -22, width: 104, height: 44)
+        let border = UIBezierPath(roundedRect: rect, cornerRadius: 8)
+        border.lineWidth = 3
+        brand.setStroke()
+        border.stroke()
+        drawText("PAID", x: rect.minX, y: rect.minY + 7, width: rect.width, font: .systemFont(ofSize: 24, weight: .heavy), color: brand, align: .center, kern: 3)
+        cg.restoreGState()
     }
 
     private enum RowStyle { case normal, bold, discount }
 
+    private func drawPayment() {
+        guard isInvoice, !business.paymentInstructions.isEmpty else { return }
+        ensureSpace(70)
+        drawSectionTitle("PAYMENT")
+        drawFlowingText(business.paymentInstructions, font: .systemFont(ofSize: 10.5), color: ink, lineSpacing: 2)
+        y += 14
+    }
+
     private func drawNotes() {
         let notes = estimate.notes.trimmed
         guard !notes.isEmpty else { return }
-        let font = UIFont.systemFont(ofSize: 10.5)
         ensureSpace(60)
         drawSectionTitle("NOTES")
-        for paragraph in notes.components(separatedBy: "\n") {
-            let text = paragraph.isEmpty ? " " : paragraph
-            let h = measure(text, width: contentWidth, font: font, lineSpacing: 2)
-            ensureSpace(h + 4)
-            drawText(text, x: margin, y: y, width: contentWidth, font: font, color: ink, lineSpacing: 2)
-            y += h + 4
-        }
+        drawFlowingText(notes, font: .systemFont(ofSize: 10.5), color: ink, lineSpacing: 2)
         y += 14
     }
 
     private func drawTerms() {
         var parts: [String] = []
-        if business.validDays > 0 { parts.append("This estimate is valid for \(business.validDays) days from the date above.") }
+        if !isInvoice, business.validDays > 0 {
+            parts.append("This estimate is valid for \(business.validDays) \(business.validDays == 1 ? "day" : "days") from the date above.")
+        }
         if !business.terms.isEmpty { parts.append(business.terms) }
         guard !parts.isEmpty else { return }
-        let text = parts.joined(separator: " ")
-        let font = UIFont.systemFont(ofSize: 8.5)
-        let h = measure(text, width: contentWidth, font: font, lineSpacing: 1.5)
-        ensureSpace(h + 40)
+        ensureSpace(60)
         drawSectionTitle("TERMS")
-        drawText(text, x: margin, y: y, width: contentWidth, font: font, color: muted, lineSpacing: 1.5)
-        y += h + 22
+        drawFlowingText(parts.joined(separator: " "), font: .systemFont(ofSize: 8.5), color: muted, lineSpacing: 1.5)
+        y += 22
+    }
+
+    /// Invoices don't need signature lines, but a signature collected on the estimate is kept as a record.
+    private func drawAcceptedLine() {
+        guard estimate.isSigned || estimate.signedAt != nil else { return }
+        ensureSpace(80)
+        y += 4
+        var text = "Accepted"
+        if !estimate.signedName.trimmed.isEmpty { text += " by \(estimate.signedName.trimmed)" }
+        if let signedAt = estimate.signedAt { text += " on \(signedAt.formatted(date: .long, time: .omitted))" }
+        y += drawText(text, x: margin, y: y, width: contentWidth, font: .systemFont(ofSize: 9), color: muted) + 4
+        if let image = signatureImage() {
+            let rect = aspectFitRect(for: image.size, in: CGRect(x: margin, y: y, width: 160, height: 36))
+            image.draw(in: rect)
+            y += 40
+        }
+        y += 10
+    }
+
+    private func signatureImage() -> UIImage? {
+        guard !skipImages, let id = estimate.signatureID else { return nil }
+        return PhotoStore.image(for: id, maxPixel: 900)
+    }
+
+    private func aspectFitRect(for size: CGSize, in box: CGRect) -> CGRect {
+        guard size.width > 0, size.height > 0 else { return box }
+        let scale = min(box.width / size.width, box.height / size.height)
+        let fitted = CGSize(width: size.width * scale, height: size.height * scale)
+        // Bottom-aligned so the signature sits on the line.
+        return CGRect(x: box.minX, y: box.maxY - fitted.height, width: fitted.width, height: fitted.height)
     }
 
     private func drawAcceptance() {
         let contractor = business.name.isEmpty ? "the contractor" : business.name
         let statement = "By signing below, the customer accepts this estimate and the terms stated on it and authorizes \(contractor) to perform the work described."
         let statementHeight = measure(statement, width: contentWidth, font: .systemFont(ofSize: 9))
-        ensureSpace(statementHeight + 150)
+        ensureSpace(statementHeight + 160)
         y += 16
         drawSectionTitle("ACCEPTANCE")
-        y += drawText(statement, x: margin, y: y, width: contentWidth, font: .systemFont(ofSize: 9), color: muted) + 38
+        y += drawText(statement, x: margin, y: y, width: contentWidth, font: .systemFont(ofSize: 9), color: muted) + 50
 
         let gap: CGFloat = 24
         let left = contentWidth * 0.62
         let rightX = margin + left + gap
         let rightWidth = contentWidth - left - gap
         let labelFont = UIFont.systemFont(ofSize: 8)
+        let valueFont = UIFont.systemFont(ofSize: 10)
+
+        // Signature image sits on the first line; the date and printed name are filled in if known.
+        if let image = signatureImage() {
+            let box = CGRect(x: margin, y: y - 46, width: left, height: 44)
+            image.draw(in: aspectFitRect(for: image.size, in: box))
+        }
+        if let signedAt = estimate.signedAt {
+            drawText(signedAt.formatted(date: .abbreviated, time: .omitted), x: rightX, y: y - 15, width: rightWidth, font: valueFont, color: ink)
+        }
 
         line(from: CGPoint(x: margin, y: y), to: CGPoint(x: margin + left, y: y))
         line(from: CGPoint(x: rightX, y: y), to: CGPoint(x: rightX + rightWidth, y: y))
@@ -336,6 +498,9 @@ final class EstimatePDF {
         drawText("Date", x: rightX, y: y, width: rightWidth, font: labelFont, color: muted)
         y += 38
 
+        if !estimate.signedName.trimmed.isEmpty {
+            drawText(estimate.signedName.trimmed, x: margin, y: y - 15, width: left, font: valueFont, color: ink)
+        }
         line(from: CGPoint(x: margin, y: y), to: CGPoint(x: margin + left, y: y))
         line(from: CGPoint(x: rightX, y: y), to: CGPoint(x: rightX + rightWidth, y: y))
         y += 4
@@ -362,7 +527,9 @@ final class EstimatePDF {
         let gap: CGFloat = 12
         let cellWidth = (contentWidth - gap * CGFloat(columns - 1)) / CGFloat(columns)
         let cellHeight = cellWidth * 0.75
-        let rowHeight = cellHeight + 26
+        let captionFont = UIFont.systemFont(ofSize: 8)
+        let captionHeight = ceil(captionFont.lineHeight * 2)
+        let rowHeight = cellHeight + 5 + captionHeight + 10
 
         for (index, item) in items.enumerated() {
             let column = index % columns
@@ -374,12 +541,12 @@ final class EstimatePDF {
             }
             let x = margin + CGFloat(column) * (cellWidth + gap)
             let rect = CGRect(x: x, y: y, width: cellWidth, height: cellHeight)
-            if let image = PhotoStore.image(for: item.id, maxPixel: 700) {
+            if !skipImages, let image = PhotoStore.image(for: item.id, maxPixel: 700) {
                 drawAspectFill(image, in: rect, radius: 6)
             } else {
                 fill(rect, color: tint, radius: 6)
             }
-            drawText(item.caption, x: x, y: y + cellHeight + 5, width: cellWidth, font: .systemFont(ofSize: 8), color: muted)
+            drawTruncatedText(item.caption, in: CGRect(x: x, y: y + cellHeight + 5, width: cellWidth, height: captionHeight), font: captionFont, color: muted)
         }
         y += rowHeight
     }
@@ -390,7 +557,7 @@ final class EstimatePDF {
         let font = UIFont.systemFont(ofSize: 8)
         let left = business.name.isEmpty ? "Tree Cost Calculator" : business.name
         drawText(left, x: margin, y: footerY, width: contentWidth / 3, font: font, color: muted)
-        drawText(estimate.numberLabel, x: margin + contentWidth / 3, y: footerY, width: contentWidth / 3, font: font, color: muted, align: .center)
+        drawText(estimate.documentLabel, x: margin + contentWidth / 3, y: footerY, width: contentWidth / 3, font: font, color: muted, align: .center)
         let page = totalPages.map { "Page \(pageNumber) of \($0)" } ?? "Page \(pageNumber)"
         drawText(page, x: margin + contentWidth * 2 / 3, y: footerY, width: contentWidth / 3, font: font, color: muted, align: .right)
     }
@@ -405,6 +572,54 @@ final class EstimatePDF {
     private func drawText(_ text: String, x: CGFloat, y: CGFloat, width: CGFloat, font: UIFont, color: UIColor = .black,
                           align: NSTextAlignment = .left, kern: CGFloat = 0, lineSpacing: CGFloat = 0) -> CGFloat {
         let attributed = attributedString(text, font: font, color: color, align: align, kern: kern, lineSpacing: lineSpacing)
+        let bounds = attributed.boundingRect(with: CGSize(width: width, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
+        let height = ceil(bounds.height)
+        attributed.draw(with: CGRect(x: x, y: y, width: width, height: height), options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
+        return height
+    }
+
+    /// Draws at most two lines in a fixed box, ending with an ellipsis, so it can never run into what follows.
+    private func drawTruncatedText(_ text: String, in rect: CGRect, font: UIFont, color: UIColor) {
+        let style = NSMutableParagraphStyle()
+        style.lineBreakMode = .byTruncatingTail
+        let attributed = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color, .paragraphStyle: style])
+        attributed.draw(with: rect, options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], context: nil)
+    }
+
+    /// Draws text that may be longer than the rest of the page, continuing on new pages as needed.
+    /// CoreText tells us how many whole lines fit in the space left.
+    private func drawFlowingText(_ text: String, font: UIFont, color: UIColor, lineSpacing: CGFloat) {
+        let attributed = attributedString(text, font: font, color: color, align: .left, kern: 0, lineSpacing: lineSpacing)
+        let framesetter = CTFramesetterCreateWithAttributedString(attributed)
+        let total = attributed.length
+        let minimumHeight = ceil(font.lineHeight) * 2 + lineSpacing
+        var location = 0
+        while location < total {
+            if bottomLimit - y < minimumHeight, y > margin { newPage() }
+            var fitted = CFRange()
+            CTFramesetterSuggestFrameSizeWithConstraints(framesetter, CFRange(location: location, length: 0), nil,
+                                                         CGSize(width: contentWidth, height: max(0, bottomLimit - y - 2)), &fitted)
+            var length = fitted.length
+            if length <= 0 {
+                // Nothing fits (should only happen on an empty page); take a line's worth rather than loop forever.
+                if y > margin { newPage(); continue }
+                length = min(80, total - location)
+            }
+            let chunk = attributed.attributedSubstring(from: NSRange(location: location, length: length))
+            // Trailing line breaks would add an empty line at the bottom of the chunk.
+            var drawLength = chunk.length
+            let chunkString = chunk.string as NSString
+            while drawLength > 0, CharacterSet.newlines.contains(UnicodeScalar(chunkString.character(at: drawLength - 1)) ?? "a") { drawLength -= 1 }
+            if drawLength > 0 {
+                y += drawAttributed(chunk.attributedSubstring(from: NSRange(location: 0, length: drawLength)), x: margin, y: y, width: contentWidth)
+            }
+            location += length
+            if location < total { newPage() }
+        }
+    }
+
+    @discardableResult
+    private func drawAttributed(_ attributed: NSAttributedString, x: CGFloat, y: CGFloat, width: CGFloat) -> CGFloat {
         let bounds = attributed.boundingRect(with: CGSize(width: width, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
         let height = ceil(bounds.height)
         attributed.draw(with: CGRect(x: x, y: y, width: width, height: height), options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)

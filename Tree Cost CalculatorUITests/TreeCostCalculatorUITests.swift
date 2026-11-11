@@ -119,15 +119,164 @@ final class TreeCostCalculatorUITests: XCTestCase {
         launch(["-demoData", "-openEstimate", "0"])
         XCTAssertTrue(app.navigationBars["EST-0005"].waitForExistence(timeout: 5))
         let regionMenu = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Texas'")).firstMatch
-        for _ in 0..<4 where !regionMenu.exists { app.swipeUp() }
+        // Scroll until the menu is on screen and clear of the bottom bar.
+        for _ in 0..<6 where !regionMenu.exists { app.swipeUp() }
+        // The bottom bar can cover the row; nudge it up with a short drag.
+        let frame = regionMenu.frame
+        if frame.maxY > app.frame.height - 160 {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+                .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)))
+        }
         snap("tax-region-before")
         XCTAssertTrue(regionMenu.exists, "Menu not found")
-        regionMenu.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        regionMenu.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         snap("tax-region-menu")
         app.buttons["Oklahoma (4.5%)"].tap()
         for _ in 0..<3 where !app.staticTexts["Tax – Oklahoma (4.5%)"].exists { app.swipeUp() }
         XCTAssertTrue(app.staticTexts["Tax – Oklahoma (4.5%)"].exists)
         snap("tax-region-oklahoma")
+    }
+
+
+    // MARK: - v1.1 features
+
+    /// Scrolls up until the element can be tapped (not off-screen or under the bottom bar).
+    private func reveal(_ element: XCUIElement, attempts: Int = 10, file: StaticString = #filePath, line: UInt = #line) {
+        for _ in 0..<attempts where !(element.exists && element.isHittable) { app.swipeUp() }
+        XCTAssertTrue(element.exists && element.isHittable, "Couldn't scroll to \(element)", file: file, line: line)
+    }
+
+    /// Replaces whatever is in a number field.
+    private func enter(_ text: String, in field: XCUIElement) {
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "Missing field \(field)")
+        field.tap()
+        let current = (field.value as? String) ?? ""
+        // An empty field reports its placeholder as the value, so always clear (extra deletes are harmless).
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count + 2))
+        field.typeText(text)
+    }
+
+    private func labelContains(_ text: String) -> NSPredicate { NSPredicate(format: "label CONTAINS %@", text) }
+
+    /// A stump-only job (no trees measured) is priced from Other Work and can be shared.
+    func testOtherWorkLineItemTotalsAndEnablesShare() {
+        launch(["-resetData", "-startingFee", "0", "-pricePerCubicFoot", "10", "-taxRate", "0"])
+        app.buttons["New Estimate"].tap()
+        XCTAssertTrue(app.buttons["Next field"].waitForExistence(timeout: 10))
+        tapKeyboardDone()
+
+        XCTAssertFalse(app.buttons["Preview & Share"].isEnabled, "Share should be off with nothing to price")
+
+        let addWork = app.buttons["Add Other Work"]
+        reveal(addWork)
+        addWork.tap()
+        let stump = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Stump grinding'")).firstMatch
+        XCTAssertTrue(stump.waitForExistence(timeout: 5))
+        stump.tap()
+
+        enter("20", in: app.textFields["Quantity for Stump grinding"])
+        enter("3", in: app.textFields.matching(NSPredicate(format: "label BEGINSWITH 'Price per'")).firstMatch)
+        tapKeyboardDone()
+        snap("other-work")
+
+        XCTAssertTrue(app.staticTexts.matching(labelContains("$60.00")).firstMatch.waitForExistence(timeout: 5), "Total should include $60.00. \(app.debugDescription)")
+        XCTAssertTrue(app.buttons["Preview & Share"].isEnabled, "A priced line item should enable sharing")
+    }
+
+    /// Estimate -> invoice -> paid through the status menu.
+    func testCreateInvoiceAndMarkPaid() {
+        launch(["-demoData", "-openEstimate", "0"])
+        XCTAssertTrue(app.navigationBars["EST-0005"].waitForExistence(timeout: 8))
+
+        app.buttons["Status: Sent"].tap()
+        app.buttons["Create Invoice"].tap()
+        XCTAssertTrue(app.navigationBars["INV-0005"].waitForExistence(timeout: 5), "Title should become the invoice number")
+        XCTAssertTrue(app.buttons["Invoice & Share"].exists)
+
+        app.buttons["Status: Invoiced"].tap()
+        app.buttons["Mark as Paid"].tap()
+        XCTAssertTrue(app.buttons["Status: Paid"].waitForExistence(timeout: 5))
+        snap("invoice-paid")
+    }
+
+    func testTreeToolsCalculate() {
+        launch(["-resetData"])
+        app.buttons["Tree Tools"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Tree Tools"].waitForExistence(timeout: 5))
+
+        let tools = ["Measure Tree Height", "Trunk Diameter", "Stump Grinding Price", "Firewood Cords", "Log Board Feet", "Log Weight"]
+        func row(_ title: String) -> XCUIElement { app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title)).firstMatch }
+        // The list behind the sheet has a "Tree Tools" button too; the back button is the last match.
+        var back: XCUIElement { app.navigationBars.buttons.matching(identifier: "Tree Tools").allElementsBoundByIndex.last ?? app.navigationBars.buttons["Tree Tools"] }
+
+        // Every tool opens.
+        for title in tools {
+            XCTAssertTrue(row(title).waitForExistence(timeout: 5), "No row for \(title)")
+            row(title).tap()
+            XCTAssertTrue(app.navigationBars.buttons["Tree Tools"].waitForExistence(timeout: 5), "\(title) didn't open")
+            back.tap()
+        }
+
+        // 72 in around (6 ft) is about 22.9 in across.
+        row("Trunk Diameter").tap()
+        enter("72", in: app.textFields["Distance around trunk"])
+        XCTAssertTrue(app.staticTexts.matching(labelContains("22.9")).firstMatch.waitForExistence(timeout: 5), "No diameter result")
+        snap("tool-diameter")
+        back.tap()
+
+        // 8 ft x 4 ft x 4 ft is exactly one cord.
+        row("Firewood Cords").tap()
+        enter("8", in: app.textFields["Stack length"])
+        enter("4", in: app.textFields["Stack width (log length)"])
+        enter("4", in: app.textFields["Stack height"])
+        XCTAssertTrue(app.staticTexts.matching(labelContains("Full cords")).firstMatch.waitForExistence(timeout: 5), "No firewood result")
+        snap("tool-firewood")
+    }
+
+    func testSettingsShowsNewRows() {
+        launch(["-demoData"])
+        app.buttons["Settings"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 8))
+        func item(_ text: String) -> XCUIElement { app.descendants(matching: .any).matching(labelContains(text)).firstMatch }
+
+        for text in ["Services & Prices", "Export All Estimates (CSV)", "Suggest a Feature or Report a Bug", "Rate Tree Cost Calculator"] {
+            for _ in 0..<10 where !item(text).exists { app.swipeUp() }
+            XCTAssertTrue(item(text).exists, "Missing \(text)")
+        }
+
+        let about = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'About'")).firstMatch
+        reveal(about)
+        about.tap()
+        XCTAssertTrue(app.navigationBars["About"].waitForExistence(timeout: 5))
+        XCTAssertTrue(item("View Source Code on GitHub").waitForExistence(timeout: 5))
+        app.navigationBars["About"].buttons.firstMatch.tap()
+
+        // Services & Prices opens too (a mistyped navigation path used to swallow these taps).
+        let services = app.staticTexts.matching(labelContains("Services & Prices")).firstMatch
+        for _ in 0..<12 where !(services.exists && services.isHittable) { app.swipeDown() }
+        services.tap()
+        XCTAssertTrue(app.navigationBars["Services & Prices"].waitForExistence(timeout: 5))
+    }
+
+    func testCustomerSignatureCanBeSigned() {
+        launch(["-demoData", "-openEstimate", "1"])
+        XCTAssertTrue(app.navigationBars["EST-0004"].waitForExistence(timeout: 8))
+
+        let sign = app.buttons["Get Customer Signature"]
+        reveal(sign)
+        sign.tap()
+
+        let pad = app.descendants(matching: .any)["Signature pad"].firstMatch
+        XCTAssertTrue(pad.waitForExistence(timeout: 5))
+        pad.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5))
+            .press(forDuration: 0.1, thenDragTo: pad.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.6)))
+        snap("signature-pad")
+        app.buttons["Save"].tap()
+
+        let caption = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Signed by'")).firstMatch
+        for _ in 0..<4 where !caption.exists { app.swipeUp() }
+        XCTAssertTrue(caption.waitForExistence(timeout: 5), "No signed-by caption")
+        XCTAssertTrue(caption.label.contains("Lena Ortiz"))
     }
 
     // MARK: - Navigation

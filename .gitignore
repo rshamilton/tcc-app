@@ -11,3 +11,7 @@ build/
 # Swift Package Manager
 .build/
 .swiftpm/
+
+# Large media
+*.mov
+*.mp4

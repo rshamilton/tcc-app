@@ -12,16 +12,17 @@ nonisolated enum SettingsFile {
     private static let bools = [SettingsKey.useMetric, SettingsKey.onboarded, SettingsKey.includePhotos,
                                 SettingsKey.itemizeTrees, SettingsKey.iCloudBackup]
     private static let doubles = [SettingsKey.startingFee, SettingsKey.ratePerUnit, SettingsKey.taxRate]
-    private static let ints = [SettingsKey.validDays, SettingsKey.nextNumber]
+    private static let ints = [SettingsKey.validDays, SettingsKey.nextNumber, SettingsKey.invoiceDueDays]
     private static let strings = [SettingsKey.companyName, SettingsKey.companyPhone, SettingsKey.companyEmail,
                                   SettingsKey.companyAddress, SettingsKey.companyLicense, SettingsKey.taxRegions,
-                                  SettingsKey.terms]
+                                  SettingsKey.terms, SettingsKey.services, SettingsKey.paymentInstructions]
 
     private static let lock = NSLock()
     nonisolated(unsafe) private static var pending: DispatchWorkItem?
     nonisolated(unsafe) private static var lastWritten: Data?
 
-    /// Only settings that differ from their default are stored.
+    /// Every known setting is stored, including ones set back to their default, so restoring the file
+    /// reproduces this device's settings exactly (a key left out would keep the other device's value).
     private static func snapshot(from defaults: UserDefaults) -> [String: Any] {
         var result: [String: Any] = [:]
         for key in bools + doubles + ints + strings {
@@ -33,7 +34,6 @@ nonisolated enum SettingsFile {
             else if ints.contains(key) { value = defaults.integer(forKey: key) as NSNumber }
             else if let text = defaults.string(forKey: key) { value = text as NSString }
             else { continue }
-            if let standard = AppDefaults.registered[key] as? NSObject, standard.isEqual(value) { continue }
             result[key] = value
         }
         return result

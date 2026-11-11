@@ -6,16 +6,10 @@
 import SwiftUI
 import PhotosUI
 
-enum AppLinks {
-    static let support = URL(string: "https://rshamilton.github.io/treecostcalculator/support")!
-    static let privacy = URL(string: "https://rshamilton.github.io/treecostcalculator/privacy")!
-    static let terms = URL(string: "https://rshamilton.github.io/treecostcalculator/terms")!
-    static let supportEmail = "treecostcalculator@googlegroups.com"
-}
-
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var launch: LaunchCoordinator
+    @EnvironmentObject private var store: EstimateStore
 
     @AppStorage(SettingsKey.companyName) private var companyName = ""
     @AppStorage(SettingsKey.companyPhone) private var companyPhone = ""
@@ -34,24 +28,49 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.includePhotos) private var includePhotos = true
     @AppStorage(SettingsKey.itemizeTrees) private var itemizeTrees = true
 
+    @AppStorage(SettingsKey.services) private var services = ServiceList()
+    @AppStorage(SettingsKey.invoiceDueDays) private var invoiceDueDays = 14
+    @AppStorage(SettingsKey.paymentInstructions) private var paymentInstructions = ""
+
     @AppStorage(SettingsKey.iCloudBackup) private var iCloudBackup = true
     @State private var usage: DataFolder.Usage?
     @State private var lastBackup: Date?
     @State private var confirmRestore = false
     private let iCloudAvailable = BackupLocation.isAvailable
 
-    @State private var path: [UUID] = []
+    // A mixed path: tax regions are pushed by id, Services and About by SettingsPage.
+    @State private var path = NavigationPath()
     @State private var logo: UIImage?
     @State private var logoItem: PhotosPickerItem?
     @FocusState private var keyboardActive: Bool
+    @State private var exportFile: ExportFile?
+    @State private var exportFailed = false
 
     private var units: UnitSystem { useMetric ? .metric : .imperial }
 
-    private var versionString: String {
-        let info = Bundle.main.infoDictionary
-        let version = info?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = info?["CFBundleVersion"] as? String ?? "1"
-        return "\(version) (\(build))"
+    /// Cubic feet in a cubic meter, for converting the saved price when the unit changes.
+    private static let cubicFeetPerCubicMeter = 35.3147
+
+    /// Switching Feet/Meters also converts the default price, so "$10 per cu ft" doesn't silently become
+    /// "$10 per m³" (35 times cheaper). Done in the setter, not `onChange`, so a settings restore that
+    /// changes both values at once isn't converted twice.
+    private var measurementBinding: Binding<Bool> {
+        Binding(
+            get: { useMetric },
+            set: { newValue in
+                guard newValue != useMetric else { return }
+                let factor = Self.cubicFeetPerCubicMeter
+                let converted = newValue ? ratePerUnit * factor : ratePerUnit / factor
+                ratePerUnit = converted.roundedToCents
+                useMetric = newValue
+            }
+        )
+    }
+
+    private var dueOptions: [Int] {
+        var options = [0, 7, 14, 15, 30, 45, 60]
+        if !options.contains(invoiceDueDays) { options.append(invoiceDueDays); options.sort() }
+        return options
     }
 
     var body: some View {
@@ -59,8 +78,10 @@ struct SettingsView: View {
             Form {
                 businessSection
                 pricingSection
+                servicesSection
                 regionsSection
                 estimateSection
+                invoiceSection
                 dataSection
                 helpSection
                 aboutSection
@@ -81,6 +102,21 @@ struct SettingsView: View {
             }
             .navigationDestination(for: UUID.self) { id in
                 TaxRegionEditor(list: $regionList, id: id)
+            }
+            .navigationDestination(for: SettingsPage.self) { page in
+                switch page {
+                case .services: ServicesSettingsView()
+                case .about: AboutView()
+                }
+            }
+            .sheet(item: $exportFile) { file in
+                ActivityShareSheet(url: file.url)
+                    .ignoresSafeArea()
+            }
+            .alert("Couldn't Export", isPresented: $exportFailed) {
+                Button("OK") {}
+            } message: {
+                Text("The estimates file couldn't be created. Check that your device has free space and try again.")
             }
             .task {
                 logo = PhotoStore.loadLogo()
@@ -167,25 +203,42 @@ struct SettingsView: View {
 
     private var pricingSection: some View {
         Section {
-            Picker("Measurements", selection: $useMetric) {
+            Picker("Measurements", selection: measurementBinding) {
                 Text("Feet").tag(false)
                 Text("Meters").tag(true)
             }
             .pickerStyle(.segmented)
 
             LabeledContent("Starting fee") {
-                NumberField(placeholder: "0", value: $startingFee, prefix: Format.currencySymbol)
+                NumberField(placeholder: "0", value: $startingFee, prefix: Format.currencySymbol, accessibilityLabel: "Starting fee")
             }
             LabeledContent("Price per \(units.volumeUnit)") {
-                NumberField(placeholder: "0", value: $ratePerUnit, prefix: Format.currencySymbol)
+                NumberField(placeholder: "0", value: $ratePerUnit, prefix: Format.currencySymbol, accessibilityLabel: "Price per \(units.volumeUnit)")
             }
             LabeledContent("Tax rate") {
-                NumberField(placeholder: "0", value: $taxRate, suffix: "%")
+                NumberField(placeholder: "0", value: $taxRate, suffix: "%", accessibilityLabel: "Default tax rate")
             }
         } header: {
             Text("Default Pricing")
         } footer: {
-            Text("Used when you start a new estimate. Existing estimates keep the prices and units they were created with.")
+            Text("Used when you start a new estimate. Existing estimates keep the prices and units they were created with. Switching between feet and meters converts the price per volume for you.")
+        }
+    }
+
+    private var servicesSection: some View {
+        Section {
+            NavigationLink(value: SettingsPage.services) {
+                HStack {
+                    Label("Services & Prices", systemImage: "wrench.and.screwdriver")
+                    Spacer()
+                    Text("\(services.items.count)")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Services")
+        } footer: {
+            Text("Stump grinding, hauling, crew time and other work you can add to any estimate under Other Work.")
         }
     }
 
@@ -247,11 +300,44 @@ struct SettingsView: View {
         }
     }
 
+    private var invoiceSection: some View {
+        Section {
+            Picker("Payment due", selection: $invoiceDueDays) {
+                ForEach(dueOptions, id: \.self) { days in
+                    Text(days == 0 ? "Due on receipt" : "\(days) days").tag(days)
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Payment instructions")
+                    .font(.subheadline.weight(.medium))
+                TextField("e.g. Check payable to…, Zelle, card on site", text: $paymentInstructions, axis: .vertical)
+                    .font(.subheadline)
+                    .lineLimit(2...6)
+            }
+            .padding(.vertical, 2)
+        } header: {
+            Text("Invoices")
+        } footer: {
+            Text("To turn an estimate into an invoice, open it and choose Create Invoice from the status menu.")
+        }
+    }
+
     // MARK: Your data
 
     private func refreshDataInfo() async {
         usage = await Task.detached(priority: .utility) { DataFolder.usage() }.value
         lastBackup = UserDefaults.standard.object(forKey: SettingsKey.lastBackup) as? Date
+    }
+
+    /// Writes every estimate to a spreadsheet file and opens the share sheet for it.
+    private func exportCSV() {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("Tree Cost Calculator Estimates.csv")
+        do {
+            try store.csv().write(to: url, atomically: true, encoding: .utf8)
+            exportFile = ExportFile(url: url)
+        } catch {
+            exportFailed = true
+        }
     }
 
     private func sizeText(_ bytes: Int64) -> String {
@@ -293,6 +379,9 @@ struct SettingsView: View {
             } label: {
                 Label("Show in Files", systemImage: "folder")
             }
+            Button(action: exportCSV) {
+                Label("Export All Estimates (CSV)", systemImage: "tablecells")
+            }
             if iCloudAvailable {
                 Button {
                     confirmRestore = true
@@ -314,31 +403,67 @@ struct SettingsView: View {
     }
 
     private var helpSection: some View {
-        Section("Help") {
+        Section("Help & Feedback") {
             Link(destination: AppLinks.support) {
                 Label("Support & FAQ", systemImage: "lifepreserver")
             }
-            if let mail = URL(string: "mailto:\(AppLinks.supportEmail)?subject=Tree%20Cost%20Calculator%20\(versionString)") {
+            if let mail = supportMailURL {
                 Link(destination: mail) {
                     Label("Email Support", systemImage: "envelope")
                 }
             }
-            Link(destination: AppLinks.privacy) {
-                Label("Privacy Policy", systemImage: "hand.raised")
+            Link(destination: AppLinks.issues) {
+                Label("Suggest a Feature or Report a Bug", systemImage: "ladybug")
             }
-            Link(destination: AppLinks.terms) {
-                Label("Terms of Use", systemImage: "doc.text")
+            Link(destination: AppLinks.writeReview) {
+                Label("Rate Tree Cost Calculator", systemImage: "star")
+            }
+            ShareLink(item: AppLinks.appStore, message: Text("A free tree removal estimate app for iPhone and iPad")) {
+                Label("Share the App", systemImage: "square.and.arrow.up")
             }
         }
     }
 
+    private var supportMailURL: URL? {
+        let subject = "Tree Cost Calculator \(AppLinks.versionString)"
+        let encoded = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Tree%20Cost%20Calculator"
+        return URL(string: "mailto:\(AppLinks.supportEmail)?subject=\(encoded)")
+    }
+
     private var aboutSection: some View {
         Section {
-            LabeledContent("Version", value: versionString)
+            NavigationLink(value: SettingsPage.about) {
+                LabeledContent("About", value: AppLinks.versionString)
+            }
+        } header: {
+            Text("About")
         } footer: {
-            Text("Prices, volumes, tax rates and every other figure in this app are calculated from what you enter and are estimates and examples only. They can be wrong or out of date. You are responsible for checking everything, and the app's maker accepts no responsibility or liability for estimates, jobs, taxes or data. See the Terms of Use.\n\nThe developer never receives your data.\n\n© 2026 Ryan Hamilton. All rights reserved.")
+            Text("Prices, volumes, tax rates and every other figure in this app are calculated from what you enter and are estimates and examples only. They can be wrong or out of date. You are responsible for checking everything, and the app's maker accepts no responsibility or liability for estimates, jobs, taxes or data. See the Terms of Use.\n\nThe developer never receives your data.\n\n© 2026 Ryan Hamilton. Free and open-source software under the GNU GPL v3.")
         }
     }
+}
+
+/// Screens pushed from the Settings list.
+private enum SettingsPage: Hashable {
+    case services
+    case about
+}
+
+/// A file ready to share (Identifiable so a sheet can present it).
+private struct ExportFile: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+/// The system share sheet for a file.
+private struct ActivityShareSheet: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 // MARK: - Tax region editor
@@ -368,7 +493,7 @@ struct TaxRegionEditor: View {
                 TextField("State or area, e.g. Texas", text: binding(\.name, fallback: ""))
                     .textInputAutocapitalization(.words)
                 LabeledContent("Tax rate") {
-                    NumberField(placeholder: "0", value: binding(\.rate, fallback: 0), suffix: "%")
+                    NumberField(placeholder: "0", value: binding(\.rate, fallback: 0), suffix: "%", accessibilityLabel: "Tax rate")
                 }
             } footer: {
                 Text("Used when you choose this region on an estimate.")
@@ -393,6 +518,14 @@ struct TaxRegionEditor: View {
         }
         .navigationTitle(region?.name.trimmed.isEmpty == false ? region!.name : "Tax Region")
         .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
+                    .fontWeight(.semibold)
+            }
+        }
         .onDisappear {
             // A region that was added but never filled in isn't worth keeping.
             if let region, region.name.trimmed.isEmpty, region.rate == 0, region.license.trimmed.isEmpty {

@@ -20,15 +20,21 @@ struct EstimatesListView: View {
     @State private var filter: EstimateStatus?
     @State private var showSettings = false
     @State private var pendingDelete: Estimate?
+    @State private var showTools = false
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private var visible: [Estimate] {
         var result = store.sortedEstimates
-        if let filter { result = result.filter { $0.status == filter } }
         let query = search.trimmed
-        if !query.isEmpty {
+        if query.isEmpty {
+            if let filter { result = result.filter { $0.status == filter } }
+        } else {
+            // Searching looks at everything: the status chips are hidden meanwhile, so a leftover filter
+            // must not silently narrow the results.
             result = result.filter { e in
-                [e.customerName, e.address, e.customerPhone, e.customerEmail, e.numberLabel, e.notes]
-                    .contains { $0.localizedCaseInsensitiveContains(query) }
+                let fields = [e.customerName, e.address, e.customerPhone, e.customerEmail,
+                              e.numberLabel, e.invoiceLabel, e.notes] + e.lineItems.map(\.name)
+                return fields.contains { $0.localizedCaseInsensitiveContains(query) }
             }
         }
         return result
@@ -41,7 +47,8 @@ struct EstimatesListView: View {
             detail
         }
         .navigationSplitViewStyle(.balanced)
-        .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showSettings) { SettingsView().environmentObject(store) }
+        .sheet(isPresented: $showTools) { ToolsView() }
         .confirmationDialog(
             "Delete this estimate?",
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
@@ -56,6 +63,9 @@ struct EstimatesListView: View {
         .onChange(of: store.estimates) { _, _ in
             // The open estimate was deleted (from the list, or from inside the editor).
             if let id = selection, store.estimate(id: id) == nil { close() }
+            // The filtered status no longer exists (e.g. the last "Sent" estimate was approved): drop the
+            // filter, otherwise the list is empty and the chips to undo it are hidden.
+            if let filter, !store.estimates.contains(where: { $0.status == filter }) { self.filter = nil }
         }
         .onChange(of: selection) { old, id in
             // Tapping a row sets the selection; make sure the editor is what's showing on iPhone.
@@ -91,6 +101,12 @@ struct EstimatesListView: View {
         }
         .navigationTitle("Estimates")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { showTools = true } label: {
+                    Image(systemName: "ruler")
+                }
+                .accessibilityLabel("Tree Tools")
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showSettings = true } label: {
                     Image(systemName: "gearshape")
@@ -109,7 +125,7 @@ struct EstimatesListView: View {
                 .id(estimate.id)
         } else if store.estimates.isEmpty {
             hero(title: "Quote your first tree",
-                 message: "Enter a tree's circumference and height and get a price on the spot. Add the customer and send them a PDF.")
+                 message: "Measure trees, add stump grinding or other work, and send the customer a PDF estimate or invoice.")
         } else {
             hero(title: "Select an estimate",
                  message: "Choose one from the list, or start a new one.")
@@ -120,7 +136,7 @@ struct EstimatesListView: View {
 
     private var list: some View {
         List(selection: $selection) {
-            if search.isEmpty {
+            if search.trimmed.isEmpty {
                 Section {
                     summaryHeader
                 }
@@ -135,9 +151,11 @@ struct EstimatesListView: View {
                         EstimateRow(estimate: estimate)
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) { pendingDelete = estimate } label: {
+                        // Not `.destructive`: that role animates the row away before the confirmation appears.
+                        Button { pendingDelete = estimate } label: {
                             Label("Delete", systemImage: "trash")
                         }
+                        .tint(.red)
                     }
                     .swipeActions(edge: .leading) {
                         Button { duplicate(estimate) } label: {
@@ -166,7 +184,7 @@ struct EstimatesListView: View {
                 }
             } footer: {
                 if visible.isEmpty {
-                    Text(search.isEmpty ? "No \(filter?.title.lowercased() ?? "") estimates." : "No estimates match \"\(search.trimmed)\".")
+                    Text(search.trimmed.isEmpty ? "No \(filter?.title.lowercased() ?? "") estimates." : "No estimates match \"\(search.trimmed)\".")
                         .frame(maxWidth: .infinity)
                         .padding(.top, 24)
                 }
@@ -179,18 +197,49 @@ struct EstimatesListView: View {
         .contentMargins(.bottom, 8, for: .scrollContent)
     }
 
+    private var unpaidTotal: Double {
+        store.unpaidInvoices.reduce(0) { $0 + $1.totals.balanceDue }
+    }
+
+    private var summaryTiles: [AnyView] {
+        let open = store.openEstimates
+        let won = store.approvedEstimates
+        var tiles = [
+            AnyView(SummaryTile(title: "Open", amount: open.reduce(0) { $0 + $1.totals.total },
+                                caption: "\(open.count) \(open.count == 1 ? "estimate" : "estimates")",
+                                symbol: "hourglass", color: .blue)),
+            AnyView(SummaryTile(title: "Won", amount: won.reduce(0) { $0 + $1.totals.total },
+                                caption: "\(won.count) \(won.count == 1 ? "job" : "jobs")",
+                                symbol: "checkmark.seal.fill", color: .green))
+        ]
+        if !store.unpaidInvoices.isEmpty {
+            let count = store.unpaidInvoices.count
+            tiles.append(AnyView(SummaryTile(title: "Unpaid", amount: unpaidTotal,
+                                             caption: "\(count) \(count == 1 ? "invoice" : "invoices")",
+                                             symbol: "creditcard.fill", color: .purple)))
+        }
+        return tiles
+    }
+
+    @ViewBuilder
+    private var tileLayout: some View {
+        let tiles = summaryTiles
+        if typeSize.isAccessibilitySize {
+            VStack(spacing: 12) {
+                ForEach(tiles.indices, id: \.self) { tiles[$0] }
+            }
+        } else {
+            HStack(spacing: 12) {
+                ForEach(tiles.indices, id: \.self) { tiles[$0] }
+            }
+        }
+    }
+
     @ViewBuilder
     private var summaryHeader: some View {
         VStack(spacing: 14) {
-            HStack(spacing: 12) {
-                SummaryTile(title: "Open", amount: store.openEstimates.reduce(0) { $0 + $1.totals.total },
-                            caption: "\(store.openEstimates.count) \(store.openEstimates.count == 1 ? "estimate" : "estimates")",
-                            symbol: "hourglass", color: .blue)
-                SummaryTile(title: "Approved", amount: store.approvedEstimates.reduce(0) { $0 + $1.totals.total },
-                            caption: "\(store.approvedEstimates.count) \(store.approvedEstimates.count == 1 ? "job" : "jobs")",
-                            symbol: "checkmark.seal.fill", color: .green)
-            }
-            if presentStatuses.count > 1 {
+            tileLayout
+            if filter != nil || presentStatuses.count > 1 {
                 statusFilter
             }
         }
@@ -237,13 +286,23 @@ struct EstimatesListView: View {
             .frame(maxWidth: .infinity)
         } else {
             hero(title: "Quote your first tree",
-                 message: "Enter a tree's circumference and height and get a price on the spot. Add the customer and send them a PDF.")
+                 message: "Measure trees, add stump grinding or other work, and send the customer a PDF estimate or invoice.")
         }
     }
 
     private func hero(title: String, message: String) -> some View {
+        // A ScrollView so the text never clips at large Dynamic Type sizes.
+        GeometryReader { geo in
+            ScrollView {
+                heroContent(title: title, message: message)
+                    .frame(maxWidth: .infinity, minHeight: geo.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    private func heroContent(title: String, message: String) -> some View {
         VStack(spacing: 20) {
-            Spacer()
             BrandTile()
                 .frame(width: 120, height: 120)
                 .shadow(color: Color.accentColor.opacity(0.35), radius: 18, y: 8)
@@ -257,9 +316,8 @@ struct EstimatesListView: View {
                     .frame(maxWidth: 420)
                     .padding(.horizontal, 40)
             }
-            Spacer()
-            Spacer()
         }
+        .padding(.vertical, 24)
         .frame(maxWidth: .infinity)
     }
 
@@ -283,10 +341,10 @@ struct EstimatesListView: View {
         // A filter or search would hide the new estimate's row.
         filter = nil
         search = ""
-        // If an empty estimate is already open (iPad), keep using it rather than piling up blanks.
+        // A blank estimate that's still open (iPad) was created with the prices of that moment, which may be
+        // stale if Settings changed since. Replace it rather than reuse it, so blanks don't pile up either.
         if let id = selection, let current = store.estimate(id: id), current.isBlank {
-            open(id)
-            return
+            store.delete(id: id)
         }
         let wasEmpty = store.estimates.isEmpty
         let id = store.createEstimate().id
@@ -321,41 +379,65 @@ struct EstimatesListView: View {
 
 struct EstimateRow: View {
     let estimate: Estimate
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private var details: String {
         var parts: [String] = []
         let count = estimate.measuredTreeCount
-        parts.append("\(count) \(count == 1 ? "tree" : "trees")")
+        if count > 0 || estimate.lineItems.isEmpty {
+            parts.append("\(count) \(count == 1 ? "tree" : "trees")")
+        }
+        let extras = estimate.lineItems.count
+        if extras > 0 { parts.append("\(extras) other \(extras == 1 ? "item" : "items")") }
         if estimate.totals.volume > 0 { parts.append(Format.volume(estimate.totals.volume, in: estimate.unitSystem)) }
         return parts.joined(separator: " · ")
     }
 
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(estimate.displayName)
-                    .font(.headline)
-                    .foregroundStyle(estimate.customerName.trimmed.isEmpty ? .secondary : .primary)
-                    .lineLimit(1)
-                if !estimate.address.trimmed.isEmpty {
-                    Text(estimate.address)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                Text(details)
-                    .font(.caption)
+    private var amountText: some View {
+        Text(Format.money(estimate.totals.total))
+            .font(.system(.headline, design: .rounded, weight: .bold))
+            .monospacedDigit()
+    }
+
+    private var textColumn: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(estimate.displayName)
+                .font(.headline)
+                .foregroundStyle(estimate.customerName.trimmed.isEmpty ? .secondary : .primary)
+                .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+            if !estimate.address.trimmed.isEmpty {
+                Text(estimate.address)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
-                Text("\(estimate.numberLabel) · \(estimate.updatedAt.formatted(.relative(presentation: .named)))")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
             }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 8) {
-                Text(Format.money(estimate.totals.total))
-                    .font(.system(.headline, design: .rounded, weight: .bold))
-                    .monospacedDigit()
-                StatusPill(status: estimate.status)
+            Text(details)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("\(estimate.documentLabel) · \(estimate.updatedAt.formatted(.relative(presentation: .named)))")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    var body: some View {
+        Group {
+            if typeSize.isAccessibilitySize {
+                // Name first, then amount and status underneath, so nothing is squeezed.
+                VStack(alignment: .leading, spacing: 8) {
+                    textColumn
+                    amountText
+                    StatusPill(status: estimate.status)
+                }
+            } else {
+                HStack(alignment: .top, spacing: 12) {
+                    textColumn
+                    Spacer(minLength: 8)
+                    VStack(alignment: .trailing, spacing: 8) {
+                        amountText
+                        StatusPill(status: estimate.status)
+                    }
+                }
             }
         }
         .padding(.vertical, 4)

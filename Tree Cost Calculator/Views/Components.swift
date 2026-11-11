@@ -7,16 +7,20 @@ import SwiftUI
 
 // MARK: - Number input
 
-/// A numeric text field that edits a `Double` live, accepts "," or "." as the decimal mark
-/// and shows a placeholder instead of "0". The text is only read from `value` when the field
-/// appears: values are never changed from elsewhere while it is on screen, and syncing back
-/// would drop characters when typing quickly.
+/// A numeric text field that edits a `Double` live, accepts "," or "." as the decimal mark (and digits
+/// from any script) and shows a placeholder instead of "0".
+///
+/// The text follows `value` when it changes from elsewhere (a tax region picked, a restore, a unit switch),
+/// but only when it would read differently, so typing is never interrupted. Showing a value never writes
+/// it back: the text holds up to six decimals, so the round trip is exact (8.375% stays 8.375%).
 struct NumberField: View {
     let placeholder: String
     @Binding var value: Double
     var prefix: String? = nil
     var suffix: String? = nil
     var alignment: TextAlignment = .trailing
+    /// What VoiceOver calls the field, e.g. "Tax rate". Without it the field would be read as its placeholder.
+    var accessibilityLabel: String? = nil
 
     @State private var text = ""
 
@@ -24,16 +28,21 @@ struct NumberField: View {
         HStack(spacing: 4) {
             if let prefix {
                 Text(prefix).foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
             TextField(placeholder, text: $text)
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(alignment)
                 .autocorrectionDisabled()
+                .accessibilityLabel(accessibilityLabel ?? placeholder)
+                .accessibilityValue(accessibilityText)
             if let suffix {
                 Text(suffix).foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
         }
-        .onAppear { text = Format.editable(value) }
+        .onAppear { syncText() }
+        .onChange(of: value) { _, _ in syncText() }
         .onChange(of: text) { _, newText in
             let clean = Format.sanitize(newText)
             if clean != newText {
@@ -41,8 +50,19 @@ struct NumberField: View {
                 return
             }
             let parsed = Format.parse(clean) ?? 0
-            if parsed != value { value = parsed }
+            if abs(parsed - value) > 1e-9 { value = parsed }
         }
+    }
+
+    private var accessibilityText: String {
+        let number = text.isEmpty ? "0" : text
+        return [prefix, number, suffix].compactMap { $0 }.joined(separator: " ")
+    }
+
+    /// Shows `value` unless the text already means the same number (e.g. "8." while typing "8.5").
+    private func syncText() {
+        let shown = Format.parse(text) ?? 0
+        if abs(shown - value) > 1e-9 { text = Format.editable(value) }
     }
 }
 
@@ -58,12 +78,15 @@ struct MeasurementField: View {
             Text(title)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             HStack(spacing: 6) {
-                NumberField(placeholder: "0", value: $value, alignment: .leading)
+                NumberField(placeholder: "0", value: $value, suffix: nil, alignment: .leading,
+                            accessibilityLabel: "\(title), \(unit == "ft" ? "feet" : unit == "m" ? "meters" : unit)")
                     .font(.title3.weight(.semibold))
                 Text(unit)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 11)

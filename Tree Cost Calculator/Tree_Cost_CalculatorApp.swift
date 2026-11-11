@@ -19,6 +19,7 @@ struct Tree_Cost_CalculatorApp: App {
         DebugLaunch.simulateFreshInstallIfRequested()
         #endif
         AppDefaults.register()
+        ReviewPrompter.noteLaunch()
         let store = EstimateStore()
         _store = StateObject(wrappedValue: store)
         // Loads the data (restoring it from the iCloud backup first if this device has none yet). Created
@@ -114,30 +115,61 @@ private final class BackgroundTask: @unchecked Sendable {
 struct RestoringView: View {
     let done: Int
     let total: Int
+    @EnvironmentObject private var launch: LaunchCoordinator
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    private var message: String {
+        total > 0 ? "Getting your estimates and photos back from iCloud (\(min(done + 1, total)) of \(total))…"
+                  : "Checking iCloud for your estimates…"
+    }
 
     var body: some View {
-        VStack(spacing: 22) {
-            BrandTile()
-                .frame(width: 110, height: 110)
-                .shadow(color: Color.accentColor.opacity(0.35), radius: 16, y: 8)
-            VStack(spacing: 6) {
-                Text("Restoring your data")
-                    .font(.title3.weight(.bold))
-                Text(total > 0 ? "Getting your estimates and photos back from iCloud (\(min(done + 1, total)) of \(total))…"
-                               : "Checking iCloud for your estimates…")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+        GeometryReader { geo in
+            ScrollView {
+                content
+                    .frame(maxWidth: .infinity, minHeight: geo.size.height)
             }
-            .padding(.horizontal, 40)
-            if total > 0 {
-                ProgressView(value: Double(done), total: Double(total))
-                    .frame(maxWidth: 240)
-            } else {
-                ProgressView()
-            }
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
+    }
+
+    private var content: some View {
+            VStack(spacing: 22) {
+                BrandTile()
+                    .frame(width: typeSize.isAccessibilitySize ? 80 : 110, height: typeSize.isAccessibilitySize ? 80 : 110)
+                    .shadow(color: Color.accentColor.opacity(0.35), radius: 16, y: 8)
+                    .accessibilityHidden(true)
+                VStack(spacing: 6) {
+                    Text("Restoring your data")
+                        .font(.title3.weight(.bold))
+                    Text(message)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 40)
+                progress
+                // A slow or stuck download must never trap the user: they can start now, and the
+                // restore is offered again later.
+                Button("Skip for Now") { launch.skipRestore() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .padding(.top, 8)
+                    .accessibilityHint("Starts the app with the data on this device. You can restore from iCloud later.")
+            }
+            .padding(.vertical, 24)
+    }
+
+    @ViewBuilder
+    private var progress: some View {
+        if total > 0 {
+            ProgressView(value: Double(done), total: Double(total))
+                .frame(maxWidth: 240)
+                .accessibilityLabel("Restoring your data")
+        } else {
+            ProgressView()
+                .accessibilityLabel("Checking iCloud")
+        }
     }
 }

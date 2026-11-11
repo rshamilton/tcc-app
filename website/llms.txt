@@ -1,0 +1,28 @@
+# Tree Cost Calculator
+
+> Tree Cost Calculator is a free iPhone and iPad app for tree service professionals that turns a tree's circumference and height into a priced tree removal estimate, then sends it to the customer as a PDF estimate or invoice. No ads, no account, open source (GNU GPL v3). Requires iOS 17 or later. Works offline.
+
+Key facts:
+- Price per tree = starting fee + volume x rate, where volume = circumference x circumference x height / 12.56 (cubic feet, or cubic meters if you measure in meters). Example: 6 ft circumference, 50 ft height = 143.3 cu ft; at $10 per cu ft plus a $150 starting fee = $1,583.12 (example rates only; the user sets their own).
+- Unlimited trees per job, each with name, measurements and photos. Other Work line items (quantity x unit price with optional minimum charge) for stump grinding per inch of diameter, trimming and pruning, haul away, crew labor, crane or bucket truck, storm work, with a saved price list.
+- Additional charge and discount (dollars or percent), tax regions with tax rate and license number per state, deposit on acceptance.
+- Customer signs on the phone; professional PDF estimate with logo, license number, terms, photos and signature block; one-tap convert to invoice with Invoiced and Paid status, due date, amount paid and balance due.
+- Tree Tools: tree height with the phone's tilt sensor (tangent method), trunk diameter (DBH), stump grinding price, firewood cords, log board feet (Doyle and International 1/4-inch), approximate green log weight by species.
+- Privacy: data stays on the device as files in a TCC folder in the Files app, with optional backup to the user's own iCloud Drive. The developer receives no data and uses no analytics.
+- Free: no ads, no subscription, no in-app purchases.
+
+## App
+- [Download on the App Store](https://apps.apple.com/app/id6760602763): iPhone and iPad, iOS 17 or later
+- [Source code on GitHub](https://github.com/rshamilton/tcc-app): GNU GPL v3; report bugs and suggest features at https://github.com/rshamilton/tcc-app/issues
+- [Home page and FAQ](https://rshamilton.github.io/treecostcalculator/): features, how the price is worked out, who it is for
+
+## Free calculators (run in the browser, no sign-up)
+- [Tree removal cost calculator](https://rshamilton.github.io/treecostcalculator/tree-removal-cost-calculator.html): price a tree from circumference, height, your rate and starting fee
+- [Stump grinding cost calculator](https://rshamilton.github.io/treecostcalculator/stump-grinding-cost-calculator.html): diameter x price per inch with a minimum charge, multiple stumps
+- [Tree height calculator](https://rshamilton.github.io/treecostcalculator/tree-height-calculator.html): tangent method with a phone clinometer, plus trunk diameter (DBH) from circumference
+- [Firewood cord calculator](https://rshamilton.github.io/treecostcalculator/firewood-cord-calculator.html): cords, face cords and cubic meters from stack dimensions (a cord is 128 cubic feet)
+
+## Help and policies
+- [Support](https://rshamilton.github.io/treecostcalculator/support.html): getting started, FAQ, troubleshooting, contact treecostcalculator@googlegroups.com
+- [Privacy Policy](https://rshamilton.github.io/treecostcalculator/privacy.html): Data Not Collected
+- [Terms of Use](https://rshamilton.github.io/treecostcalculator/terms.html): GPL v3 source license, Apple EULA for the App Store copy, estimates-only disclaimers

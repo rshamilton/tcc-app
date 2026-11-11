@@ -5,6 +5,7 @@
 
 import Foundation
 import Combine
+import UIKit
 
 /// Where the backup copy of the data folder lives: the app's iCloud Drive container, which survives
 /// deleting the app. (Debug builds can point it at any folder with `-backupDir <path>` for testing.)
@@ -35,6 +36,14 @@ nonisolated enum BackupLocation {
     }
 }
 
+/// Lets the launch coordinator tell restore work running off the main thread to stop.
+nonisolated final class CancelFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var flag = false
+    var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return flag }
+    func cancel() { lock.lock(); flag = true; lock.unlock() }
+}
+
 // MARK: - Coordinated file helpers
 
 nonisolated enum BackupFiles {
@@ -43,45 +52,82 @@ nonisolated enum BackupFiles {
         var coordinationError: NSError?
         var copyError: Error?
         NSFileCoordinator().coordinate(writingItemAt: destination, options: .forReplacing, error: &coordinationError) { url in
-            do {
-                let fm = FileManager.default
-                try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-                if fm.fileExists(atPath: url.path) { try fm.removeItem(at: url) }
-                try fm.copyItem(at: source, to: url)
-            } catch {
-                copyError = error
-            }
+            do { try copyReplacing(source, to: url) } catch { copyError = error }
         }
         if let error = coordinationError ?? copyError { throw error }
     }
 
-    static func remove(_ url: URL) {
-        var coordinationError: NSError?
-        NSFileCoordinator().coordinate(writingItemAt: url, options: .forDeleting, error: &coordinationError) { target in
-            try? FileManager.default.removeItem(at: target)
+    /// Copies via a temporary file next to the destination, then swaps it in, so the destination is never
+    /// left missing or half-written if the copy fails part way.
+    private static func copyReplacing(_ source: URL, to destination: URL) throws {
+        let fm = FileManager.default
+        let directory = destination.deletingLastPathComponent()
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        let temp = directory.appendingPathComponent(".\(UUID().uuidString).tmp")
+        try fm.copyItem(at: source, to: temp)
+        do {
+            if fm.fileExists(atPath: destination.path) {
+                _ = try fm.replaceItemAt(destination, withItemAt: temp)
+            } else {
+                try fm.moveItem(at: temp, to: destination)
+            }
+        } catch {
+            try? fm.removeItem(at: temp)
+            throw error
         }
     }
 
-    /// Copies a file out of the backup, first waiting for iCloud to download it.
-    static func fetch(_ source: URL, to destination: URL) throws {
-        try? FileManager.default.startDownloadingUbiquitousItem(at: source)
+    /// iCloud's stand-in for a file that isn't downloaded: ".<name>.icloud" next to where it would be.
+    private static func placeholder(for url: URL) -> URL {
+        url.deletingLastPathComponent().appendingPathComponent("." + url.lastPathComponent + ".icloud")
+    }
+
+    /// True when the file is in the backup, downloaded or not.
+    static func exists(_ url: URL) -> Bool {
+        let fm = FileManager.default
+        return fm.fileExists(atPath: url.path) || fm.fileExists(atPath: placeholder(for: url).path)
+    }
+
+    /// Removes a file (and its iCloud placeholder, if any). Returns true when it is gone afterwards,
+    /// including when it was never there; false means the caller should try again later.
+    @discardableResult
+    static func remove(_ url: URL) -> Bool {
+        let fm = FileManager.default
+        var ok = true
+        for target in [url, placeholder(for: url)] where fm.fileExists(atPath: target.path) {
+            var coordinationError: NSError?
+            var removed = false
+            NSFileCoordinator().coordinate(writingItemAt: target, options: .forDeleting, error: &coordinationError) { item in
+                removed = (try? fm.removeItem(at: item)) != nil
+            }
+            if coordinationError != nil || !removed { ok = false }
+        }
+        return ok
+    }
+
+    /// Copies a file out of the backup, first waiting (up to 45 seconds) for iCloud to download it.
+    /// Throws, rather than blocking in a coordinated read, if it still hasn't arrived by then.
+    static func fetch(_ source: URL, to destination: URL, cancel: CancelFlag? = nil) throws {
+        let fm = FileManager.default
+        try? fm.startDownloadingUbiquitousItem(at: source)
         let deadline = Date().addingTimeInterval(45)
-        while Date() < deadline {
-            let status = try? source.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]).ubiquitousItemDownloadingStatus
-            if status == nil || status == .current || status == .downloaded { break }
+        var ready = false
+        while true {
+            if let status = (try? source.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]))?.ubiquitousItemDownloadingStatus {
+                ready = status == .current || status == .downloaded
+            } else {
+                // Not an iCloud item (or no status yet): fine as long as the file is really there.
+                ready = fm.fileExists(atPath: source.path)
+            }
+            if ready || Date() >= deadline || cancel?.isCancelled == true { break }
             Thread.sleep(forTimeInterval: 0.3)
         }
+        guard ready, cancel?.isCancelled != true else { throw CocoaError(.fileReadUnknown) }
+
         var coordinationError: NSError?
         var copyError: Error?
         NSFileCoordinator().coordinate(readingItemAt: source, options: [], error: &coordinationError) { url in
-            do {
-                let fm = FileManager.default
-                try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-                if fm.fileExists(atPath: destination.path) { try fm.removeItem(at: destination) }
-                try fm.copyItem(at: url, to: destination)
-            } catch {
-                copyError = error
-            }
+            do { try copyReplacing(url, to: destination) } catch { copyError = error }
         }
         if let error = coordinationError ?? copyError { throw error }
     }
@@ -139,7 +185,10 @@ nonisolated final class BackupScheduler: @unchecked Sendable {
 
     private let queue = DispatchQueue(label: "me.ryham.tcc.backup", qos: .utility)
     private let lock = NSLock()
-    private var pendingDeletes = Set<String>()
+    /// Files the app deleted that still have to be removed from the backup. Kept in UserDefaults (not in
+    /// Documents) so a deletion made just before the app closed isn't forgotten.
+    private static let pendingKey = "backupPendingDeletes"
+    private var pendingDeletes = Set<String>(UserDefaults.standard.stringArray(forKey: BackupScheduler.pendingKey) ?? [])
     private var work: DispatchWorkItem?
     private var ready = false
 
@@ -150,8 +199,16 @@ nonisolated final class BackupScheduler: @unchecked Sendable {
     }
 
     func noteDeletion(_ relativePath: String) {
-        lock.lock(); pendingDeletes.insert(relativePath); lock.unlock()
+        lock.lock()
+        pendingDeletes.insert(relativePath)
+        savePendingDeletes()
+        lock.unlock()
         schedule()
+    }
+
+    /// Call with `lock` held.
+    private func savePendingDeletes() {
+        UserDefaults.standard.set(pendingDeletes.sorted(), forKey: Self.pendingKey)
     }
 
     func schedule(after delay: TimeInterval = 4) {
@@ -179,8 +236,6 @@ nonisolated final class BackupScheduler: @unchecked Sendable {
         lock.unlock()
         guard isReady, BackupLocation.isEnabled, BackupLocation.isAvailable, let mirror = BackupLocation.url() else { return }
 
-        lock.lock(); pendingDeletes.subtract(deletes); lock.unlock()
-
         let fm = FileManager.default
         let linked = UserDefaults.standard.bool(forKey: SettingsKey.backupLinked)
         var failed = false
@@ -193,17 +248,27 @@ nonisolated final class BackupScheduler: @unchecked Sendable {
             guard needsCopy(source: source, target: target, relative: relative) else { continue }
             do { try BackupFiles.write(source, to: target) } catch { failed = true }
         }
-        for relative in deletes where BackupFiles.isDataFile(relative) {
+        // A deletion is forgotten only once it has actually happened in the backup (or was moot).
+        var settled = Set<String>()
+        for relative in deletes {
+            guard BackupFiles.isDataFile(relative) else { settled.insert(relative); continue }
             if !linked, relative == "Settings.json" || relative == "Logo.png" { continue }
-            let target = mirror.appendingPathComponent(relative)
-            if fm.fileExists(atPath: target.path) { BackupFiles.remove(target) }
+            // Recreated since (a new logo after Remove Logo, say): keep the new copy; the copy loop above handled it.
+            if fm.fileExists(atPath: DataFolder.root.appendingPathComponent(relative).path) { settled.insert(relative); continue }
+            if BackupFiles.remove(mirror.appendingPathComponent(relative)) { settled.insert(relative) }
+            else { failed = true }
+        }
+        if !settled.isEmpty {
+            lock.lock()
+            pendingDeletes.subtract(settled)
+            savePendingDeletes()
+            lock.unlock()
         }
         if !failed { UserDefaults.standard.set(Date(), forKey: SettingsKey.lastBackup) }
     }
 
     private func needsCopy(source: URL, target: URL, relative: String) -> Bool {
-        let fm = FileManager.default
-        guard fm.fileExists(atPath: target.path) else { return true }
+        guard BackupFiles.exists(target) else { return true }
         // Photos never change once saved.
         if relative.hasPrefix("Photos/") { return false }
         // The other files are small, so compare what's in them.
@@ -232,6 +297,17 @@ enum BackupRestore {
     /// may take a while to learn which files exist, so when nothing shows up it keeps looking for up to
     /// `patience` seconds, and when files do show up it waits for the list to stop growing.
     static func contents(patience: TimeInterval) async -> [BackupItem]? {
+        await snapshot(patience: patience)?.items
+    }
+
+    /// The backup listing, plus whether iCloud's index finished gathering (when it didn't, an empty
+    /// listing doesn't prove there is no backup).
+    struct Snapshot {
+        let items: [BackupItem]
+        let gathered: Bool
+    }
+
+    static func snapshot(patience: TimeInterval) async -> Snapshot? {
         guard BackupLocation.isAvailable else { return nil }
         let mirror = await Task.detached(priority: .userInitiated) { BackupLocation.url() }.value
         guard let mirror else { return nil }
@@ -247,7 +323,7 @@ enum BackupRestore {
 
         #if DEBUG
         if DebugLaunch.value(after: "-backupDir") != nil {
-            return found.map { BackupItem(relative: $0.key, url: $0.value) }
+            return Snapshot(items: found.map { BackupItem(relative: $0.key, url: $0.value) }, gathered: true)
         }
         #endif
 
@@ -264,6 +340,7 @@ enum BackupRestore {
         var stableSince = Date()
         while Date().timeIntervalSince(start) < patience + 20 {
             try? await Task.sleep(for: .milliseconds(300))
+            if Task.isCancelled { return nil }
             guard !query.isGathering else { continue }
             let now = Date()
             if gatheredAt == nil { gatheredAt = now }
@@ -282,11 +359,14 @@ enum BackupRestore {
                 break
             }
         }
-        return found.map { BackupItem(relative: $0.key, url: $0.value) }
+        return Snapshot(items: found.map { BackupItem(relative: $0.key, url: $0.value) }, gathered: gatheredAt != nil)
     }
 
     struct Result {
-        var estimates = 0
+        /// New plus updated estimates.
+        var estimates: Int { newEstimates + updatedEstimates }
+        var newEstimates = 0
+        var updatedEstimates = 0
         var failed = 0
         var appliedSettings = false
     }
@@ -294,10 +374,11 @@ enum BackupRestore {
     /// Copies estimates, the logo and settings from the backup. Only files missing here are copied,
     /// except that `updateChanged` also brings over estimates that are newer in the backup (used when the
     /// user asks to restore). Photos are fetched separately by `restorePhotos`, once the estimates are loaded.
-    static func restoreData(_ items: [BackupItem], updateChanged: Bool, progress: @escaping (Int, Int) -> Void) async -> Result {
+    static func restoreData(_ items: [BackupItem], updateChanged: Bool, cancel: CancelFlag? = nil, progress: @escaping (Int, Int) -> Void) async -> Result {
         DataFolder.prepare()
         let fm = FileManager.default
         var work: [(item: BackupItem, destination: URL)] = []
+        var updates = Set<String>()
         for item in items where !item.relative.hasPrefix("Photos/") {
             let local = DataFolder.root.appendingPathComponent(item.relative)
             if item.relative == "Settings.json" {
@@ -308,6 +389,7 @@ enum BackupRestore {
                 work.append((item, local))
             } else if updateChanged, item.relative.hasPrefix("Estimates/"), BackupFiles.isNewer(item.url, than: local) {
                 work.append((item, local))
+                updates.insert(item.relative)
             }
         }
 
@@ -318,10 +400,10 @@ enum BackupRestore {
         await withTaskGroup(of: (BackupItem, URL, Bool).self) { group in
             var pending = work[...]
             func startNext() {
-                guard let next = pending.popFirst() else { return }
+                guard cancel?.isCancelled != true, let next = pending.popFirst() else { return }
                 group.addTask {
                     let ok = await Task.detached(priority: .userInitiated) {
-                        (try? BackupFiles.fetch(next.item.url, to: next.destination)) != nil
+                        (try? BackupFiles.fetch(next.item.url, to: next.destination, cancel: cancel)) != nil
                     }.value
                     return (next.item, next.destination, ok)
                 }
@@ -336,7 +418,7 @@ enum BackupRestore {
                     if let data = try? Data(contentsOf: destination) { result.appliedSettings = SettingsFile.apply(data) }
                     try? fm.removeItem(at: destination)
                 } else if item.relative.hasPrefix("Estimates/") {
-                    result.estimates += 1
+                    if updates.contains(item.relative) { result.updatedEstimates += 1 } else { result.newEstimates += 1 }
                 }
                 startNext()
             }
@@ -356,7 +438,11 @@ enum BackupRestore {
             return !fm.fileExists(atPath: DataFolder.root.appendingPathComponent(item.relative).path)
         }
         guard !photos.isEmpty else { return }
+        // Keeps the downloads going for a little while if the app is sent to the background.
+        let background = BackgroundTaskBox()
+        background.begin()
         Task.detached(priority: .utility) {
+            defer { Task { @MainActor in background.end() } }
             await withTaskGroup(of: Void.self) { group in
                 var pending = photos[...]
                 func startNext() {
@@ -372,6 +458,23 @@ enum BackupRestore {
                 for await _ in group { startNext() }
             }
         }
+    }
+}
+
+@MainActor
+private final class BackgroundTaskBox {
+    private var id = UIBackgroundTaskIdentifier.invalid
+
+    func begin() {
+        id = UIApplication.shared.beginBackgroundTask(withName: "RestorePhotos") { [weak self] in
+            MainActor.assumeIsolated { self?.end() }
+        }
+    }
+
+    func end() {
+        guard id != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(id)
+        id = .invalid
     }
 }
 
@@ -404,7 +507,18 @@ final class LaunchCoordinator: ObservableObject {
 
     private let store: EstimateStore
     private var watchTask: Task<Void, Never>?
+    private var photoTask: Task<Void, Never>?
     private var launched = false
+
+    /// Identifies the restore that is currently running. A restore that finishes after it was skipped (or
+    /// replaced) no longer matches, so it can't call `finish()` a second time or touch state.
+    private var restoreToken: UUID?
+    private var restoreCancel: CancelFlag?
+    private var restoreTask: Task<Void, Never>?
+    private var deadlineTask: Task<Void, Never>?
+    private var restoreIsUserInitiated = false
+    /// The longest the automatic restore at launch may keep the app waiting.
+    private static let launchRestoreDeadline: Duration = .seconds(45)
 
     init(store: EstimateStore) {
         self.store = store
@@ -416,7 +530,7 @@ final class LaunchCoordinator: ObservableObject {
             defaults.set(false, forKey: SettingsKey.backupLinked)
             if BackupLocation.isEnabled, BackupLocation.isAvailable {
                 phase = .restoring(done: 0, total: 0)
-                Task { await restore(userInitiated: false) }
+                startRestore(userInitiated: false)
                 return
             }
         } else if defaults.object(forKey: SettingsKey.backupLinked) == nil {
@@ -436,7 +550,48 @@ final class LaunchCoordinator: ObservableObject {
         backupOffer = nil
         store.flush()
         phase = .restoring(done: 0, total: 0)
-        Task { await restore(userInitiated: true) }
+        startRestore(userInitiated: true)
+    }
+
+    /// Stops a restore that is taking too long and opens the app with the data already on this device.
+    /// The device stays unlinked if it was, so the backup is still offered later.
+    func skipRestore() {
+        guard case .restoring = phase else { return }
+        let wasUserInitiated = restoreIsUserInitiated
+        endRestore()
+        finish()
+        if wasUserInitiated {
+            restoreMessage = "The restore was stopped. Anything already downloaded was kept; you can try again from Settings."
+        } else {
+            watchForBackup()
+        }
+    }
+
+    private func startRestore(userInitiated: Bool) {
+        let token = UUID()
+        let cancel = CancelFlag()
+        restoreToken = token
+        restoreCancel = cancel
+        restoreIsUserInitiated = userInitiated
+        restoreTask = Task { await restore(userInitiated: userInitiated, token: token, cancel: cancel) }
+        if !userInitiated {
+            deadlineTask = Task { [weak self] in
+                try? await Task.sleep(for: Self.launchRestoreDeadline)
+                guard !Task.isCancelled else { return }
+                self?.skipRestore()
+            }
+        }
+    }
+
+    /// Cancels everything belonging to the current restore and invalidates its token.
+    private func endRestore() {
+        restoreToken = nil
+        restoreCancel?.cancel()
+        restoreCancel = nil
+        restoreTask?.cancel()
+        restoreTask = nil
+        deadlineTask?.cancel()
+        deadlineTask = nil
     }
 
     /// The user chose to keep this device's data instead of restoring the backup it found.
@@ -451,17 +606,21 @@ final class LaunchCoordinator: ObservableObject {
         BackupScheduler.shared.schedule(after: 1)
     }
 
-    private func restore(userInitiated: Bool) async {
+    private func restore(userInitiated: Bool, token: UUID, cancel: CancelFlag) async {
         let items = await BackupRestore.contents(patience: userInitiated ? 10 : 4)
+        guard restoreToken == token else { return }
         var result = BackupRestore.Result()
         if let items, !items.isEmpty {
-            result = await BackupRestore.restoreData(items, updateChanged: userInitiated) { [weak self] done, total in
-                self?.phase = .restoring(done: done, total: total)
+            result = await BackupRestore.restoreData(items, updateChanged: userInitiated, cancel: cancel) { [weak self] done, total in
+                guard let self, self.restoreToken == token else { return }
+                self.phase = .restoring(done: done, total: total)
             }
+            guard restoreToken == token else { return }
             let backupHasSettings = items.contains { $0.relative == "Settings.json" }
             if result.appliedSettings || !backupHasSettings { link() }
         }
-        finish()
+        endRestore()
+        finish(scanPhotos: false)
         if let items {
             BackupRestore.restorePhotos(items, referenced: Set(store.estimates.flatMap(\.allPhotoIDs)))
         }
@@ -476,19 +635,24 @@ final class LaunchCoordinator: ObservableObject {
     private static func message(for result: BackupRestore.Result, items: [BackupItem]?) -> String {
         guard let items else { return "Couldn't reach iCloud Drive. Check that you're signed in to iCloud and iCloud Drive is on, then try again." }
         guard !items.isEmpty else { return "There's no backup in iCloud Drive yet." }
-        var text: String
-        switch result.estimates {
-        case 0: text = "Everything in the backup is already on this device."
-        case 1: text = "Restored 1 estimate."
-        default: text = "Restored \(result.estimates) estimates."
+        if result.failed > 0, result.estimates == 0, !result.appliedSettings {
+            return "Nothing could be downloaded yet. Check your connection and try again."
         }
-        if result.appliedSettings, result.estimates > 0 { text += " Settings were restored too." }
+        var parts: [String] = []
+        if result.newEstimates > 0 {
+            parts.append(result.newEstimates == 1 ? "Restored 1 estimate." : "Restored \(result.newEstimates) estimates.")
+        }
+        if result.updatedEstimates > 0 {
+            parts.append(result.updatedEstimates == 1 ? "Updated 1 estimate from the backup." : "Updated \(result.updatedEstimates) estimates from the backup.")
+        }
+        if result.appliedSettings { parts.append("Settings were restored.") }
+        if parts.isEmpty { parts.append("Everything in the backup is already on this device.") }
         if result.failed > 0 {
-            text += " \(result.failed) \(result.failed == 1 ? "file" : "files") couldn't be downloaded yet; try again in a few minutes."
+            parts.append("\(result.failed) \(result.failed == 1 ? "file" : "files") couldn't be downloaded yet; try again in a few minutes.")
         } else if items.contains(where: { $0.relative.hasPrefix("Photos/") }) {
-            text += " Photos will appear as they download."
+            parts.append("Photos will appear as they download.")
         }
-        return text
+        return parts.joined(separator: " ")
     }
 
     /// While this device isn't linked, keeps an eye out for a backup that iCloud hadn't downloaded the
@@ -499,14 +663,16 @@ final class LaunchCoordinator: ObservableObject {
         watchTask = Task { [weak self] in
             let started = Date()
             while !Task.isCancelled {
-                guard let items = await BackupRestore.contents(patience: 0), !Task.isCancelled, let self else { return }
+                guard let snapshot = await BackupRestore.snapshot(patience: 0), !Task.isCancelled, let self else { return }
+                let items = snapshot.items
                 let local = Set(DataFolder.dataFiles())
                 let missing = items.filter { $0.relative.hasPrefix("Estimates/") && !local.contains($0.relative) }.count
                 if missing > 0 || items.contains(where: { $0.relative == "Settings.json" }) {
                     if self.phase == .ready { self.backupOffer = BackupOffer(estimates: missing) }
                     return
                 }
-                if Date().timeIntervalSince(started) > 60 {
+                // Only conclude "no backup" when iCloud's index positively finished and showed nothing.
+                if snapshot.gathered, Date().timeIntervalSince(started) > 60 {
                     self.link()
                     return
                 }
@@ -515,7 +681,7 @@ final class LaunchCoordinator: ObservableObject {
         }
     }
 
-    private func finish() {
+    private func finish(scanPhotos: Bool = true) {
         store.reload()
         BackupScheduler.shared.markReady()
         phase = .ready
@@ -523,5 +689,21 @@ final class LaunchCoordinator: ObservableObject {
         if !launched { DebugLaunch.seedIfRequested(store) }
         #endif
         launched = true
+        if scanPhotos { restoreMissingPhotos() }
+    }
+
+    /// Photos that were still downloading when the app last closed are fetched again: any photo an estimate
+    /// uses that isn't on this device, if the backup has it.
+    private func restoreMissingPhotos() {
+        guard isLinked, BackupLocation.isEnabled, BackupLocation.isAvailable else { return }
+        let fm = FileManager.default
+        let missing = Set(store.estimates.flatMap(\.allPhotoIDs).filter { !fm.fileExists(atPath: PhotoStore.url(for: $0).path) })
+        guard !missing.isEmpty else { return }
+        photoTask?.cancel()
+        photoTask = Task {
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled, let items = await BackupRestore.contents(patience: 0), !Task.isCancelled else { return }
+            BackupRestore.restorePhotos(items, referenced: missing)
+        }
     }
 }

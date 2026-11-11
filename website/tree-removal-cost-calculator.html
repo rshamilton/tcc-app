@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tree Removal Cost Calculator: price a tree by circumference and height</title>
+<meta name="description" content="Free tree removal cost calculator. Enter trunk circumference, height, your own rate and starting fee to get the tree&#x27;s volume and price. Includes the formula and a worked example.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#1e8a4a">
+<link rel="canonical" href="https://rshamilton.github.io/treecostcalculator/tree-removal-cost-calculator.html">
+<meta property="og:url" content="https://rshamilton.github.io/treecostcalculator/tree-removal-cost-calculator.html">
+<meta property="og:title" content="Tree Removal Cost Calculator: price a tree by circumference and height">
+<meta property="og:description" content="Free tree removal cost calculator. Enter trunk circumference, height, your own rate and starting fee to get the tree&#x27;s volume and price. Includes the formula and a worked example.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Tree Cost Calculator">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Tree Removal Cost Calculator: price a tree by circumference and height">
+<meta name="twitter:description" content="Free tree removal cost calculator. Enter trunk circumference, height, your own rate and starting fee to get the tree&#x27;s volume and price. Includes the formula and a worked example.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%201024%201024%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3ClinearGradient%20id=%22bg%22%20x1=%220.15%22%20y1=%220%22%20x2=%220.85%22%20y2=%221%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%2340C67E%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%230B5A38%22/%3E%3C/linearGradient%3E%0A%20%20%20%20%3ClinearGradient%20id=%22trunk%22%20x1=%220%22%20y1=%220%22%20x2=%221%22%20y2=%220%22%3E%3Cstop%20offset=%220%22%20stop-color=%22%23E4B078%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22%23C68C52%22/%3E%3C/linearGradient%3E%0A%20%20%3C/defs%3E%0A%20%20%3Crect%20width=%221024%22%20height=%221024%22%20rx=%22230%22%20fill=%22url%28%23bg%29%22/%3E%0A%20%20%3Cellipse%20cx=%22512%22%20cy=%22884%22%20rx=%22306%22%20ry=%2246%22%20fill=%22%230B4D31%22%20opacity=%220.55%22/%3E%0A%20%20%3Cpath%20d=%22M462%20500%20L562%20500%20C566%20640%20578%20760%20632%20878%20L392%20878%20C446%20760%20458%20640%20462%20500%20Z%22%20fill=%22url%28%23trunk%29%22/%3E%0A%20%20%3C%21--%20canopy%20shade%20layer%20%28offset%20down%29%20--%3E%0A%20%20%3Cg%20fill=%22%23DCE8CF%22%20transform=%22translate%280%2018%29%22%3E%0A%20%20%20%20%3Ccircle%20cx=%22512%22%20cy=%22286%22%20r=%22174%22/%3E%3Ccircle%20cx=%22348%22%20cy=%22396%22%20r=%22136%22/%3E%3Ccircle%20cx=%22676%22%20cy=%22396%22%20r=%22136%22/%3E%0A%20%20%20%20%3Ccircle%20cx=%22402%22%20cy=%22478%22%20r=%22108%22/%3E%3Ccircle%20cx=%22622%22%20cy=%22478%22%20r=%22108%22/%3E%3Ccircle%20cx=%22512%22%20cy=%22420%22%20r=%22172%22/%3E%0A%20%20%3C/g%3E%0A%20%20%3Cg%20fill=%22%23FBF8EC%22%3E%0A%20%20%20%20%3Ccircle%20cx=%22512%22%20cy=%22286%22%20r=%22178%22/%3E%3Ccircle%20cx=%22348%22%20cy=%22396%22%20r=%22140%22/%3E%3Ccircle%20cx=%22676%22%20cy=%22396%22%20r=%22140%22/%3E%0A%20%20%20%20%3Ccircle%20cx=%22402%22%20cy=%22478%22%20r=%22112%22/%3E%3Ccircle%20cx=%22622%22%20cy=%22478%22%20r=%22112%22/%3E%3Ccircle%20cx=%22512%22%20cy=%22420%22%20r=%22176%22/%3E%0A%20%20%3C/g%3E%0A%20%20%3C%21--%20tape%20tail%20--%3E%0A%20%20%3Cpath%20d=%22M590%20716%20L646%20724%20L656%20842%20L598%20848%20Z%22%20fill=%22%23F7C948%22%20/%3E%0A%20%20%3Cpath%20d=%22M598%20848%20L656%20842%20L658%20868%20L600%20874%20Z%22%20fill=%22%23D9A521%22%20/%3E%0A%20%20%3Cg%20stroke=%22%235B3A05%22%20stroke-width=%226%22%20stroke-linecap=%22round%22%20opacity=%220.9%22%3E%0A%20%20%20%20%3Cline%20x1=%22606%22%20y1=%22752%22%20x2=%22624%22%20y2=%22754%22/%3E%3Cline%20x1=%22607%22%20y1=%22782%22%20x2=%22625%22%20y2=%22784%22/%3E%3Cline%20x1=%22608%22%20y1=%22812%22%20x2=%22626%22%20y2=%22814%22/%3E%0A%20%20%3C/g%3E%0A%20%20%3C%21--%20tape%20band%20--%3E%0A%20%20%3Cpath%20d=%22M404%20668%20Q512%20716%20620%20668%20L620%20748%20Q512%20796%20404%20748%20Z%22%20fill=%22%23F7C948%22/%3E%0A%20%20%3Cpath%20d=%22M404%20668%20Q512%20716%20620%20668%22%20fill=%22none%22%20stroke=%22%23C9931A%22%20stroke-width=%226%22/%3E%0A%20%20%3Cpath%20d=%22M404%20748%20Q512%20796%20620%20748%22%20fill=%22none%22%20stroke=%22%23C9931A%22%20stroke-width=%226%22/%3E%0A%20%20%3Cg%20stroke=%22%235B3A05%22%20stroke-width=%227%22%20stroke-linecap=%22round%22%3E%0A%20%20%20%20%3Cline%20x1=%22436%22%20y1=%22690%22%20x2=%22436%22%20y2=%22714%22/%3E%3Cline%20x1=%22468%22%20y1=%22699%22%20x2=%22468%22%20y2=%22726%22/%3E%3Cline%20x1=%22500%22%20y1=%22705%22%20x2=%22500%22%20y2=%22730%22/%3E%0A%20%20%20%20%3Cline%20x1=%22532%22%20y1=%22705%22%20x2=%22532%22%20y2=%22730%22/%3E%3Cline%20x1=%22564%22%20y1=%22699%22%20x2=%22564%22%20y2=%22726%22/%3E%3Cline%20x1=%22596%22%20y1=%22690%22%20x2=%22596%22%20y2=%22714%22/%3E%0A%20%20%3C/g%3E%0A%3C/svg%3E">
+<style>
+:root{
+  --bg:#f5f7f3; --surface:#ffffff; --surface-2:#eef3ee; --ink:#14231b; --muted:#5a6a60; --line:#dde5de;
+  --brand:#17783d; --brand-ink:#0b5a38; --brand-soft:#e3f3e8; --amber:#f7c948; --danger:#c0392b; --field:#7d8d82;
+  --shadow:0 1px 2px rgba(20,35,27,.06),0 8px 24px rgba(20,35,27,.06);
+  --radius:16px;
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#0d1511; --surface:#16211b; --surface-2:#1c2a22; --ink:#eaf2ec; --muted:#9fb2a6; --line:#26362c;
+    --brand:#4cd086; --brand-ink:#7fe0a8; --brand-soft:#173427; --field:#5d7366; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35)}
+}
+*{box-sizing:border-box;margin:0}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{font:16px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+a{color:var(--brand);text-decoration:none}a:hover{text-decoration:underline}
+img,svg{max-width:100%}
+.wrap{width:min(1080px,100% - 40px);margin-inline:auto}
+.narrow{width:min(760px,100% - 40px);margin-inline:auto}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px;border-radius:6px}
+.skip{position:absolute;left:-999px}.skip:focus{left:12px;top:12px;background:var(--surface);padding:8px 12px;border-radius:8px;z-index:99}
+
+header.site{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(1.4) blur(12px);-webkit-backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)}
+header.site .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;gap:16px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+.brand:hover{text-decoration:none}
+.brand svg{width:32px;height:32px;flex:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.2))}
+nav.main{display:flex;gap:4px;align-items:center}
+nav.main a{color:var(--muted);font-weight:500;font-size:15px;padding:8px 12px;border-radius:999px}
+nav.main a:hover{color:var(--ink);background:var(--surface-2);text-decoration:none}
+nav.main a[aria-current=page]{color:var(--ink);background:var(--surface-2)}
+nav.main{flex-wrap:wrap;justify-content:flex-end}
+@media (max-width:640px){.brand span{display:none}nav.main a{padding:6px 9px;font-size:14px}}
+@media (max-width:420px){header.site{position:static}header.site .wrap{height:auto;padding:8px 0}}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 16px/1 inherit;font-family:inherit;padding:14px 22px;border-radius:999px;border:0;cursor:pointer;background:var(--brand);color:#fff;transition:transform .12s,box-shadow .12s,background .12s;box-shadow:0 6px 16px color-mix(in srgb,var(--brand) 35%,transparent)}
+.btn:hover{text-decoration:none;transform:translateY(-1px)}
+.btn.secondary{background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.btn.small{padding:10px 16px;font-size:14px;box-shadow:none}
+@media (prefers-color-scheme: dark){.btn{color:#062414}}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+
+footer.site{margin-top:80px;border-top:1px solid var(--line);padding:32px 0 48px;color:var(--muted);font-size:14px}
+footer.site .wrap{display:flex;flex-direction:column;gap:14px}
+footer.site nav{display:flex;gap:18px;flex-wrap:wrap}
+footer.site a{color:var(--muted)}footer.site a:hover{color:var(--ink)}
+
+/* Document pages (privacy, support) */
+.doc-hero{padding:56px 0 24px}
+.doc-hero h1{font-size:clamp(32px,5vw,44px);line-height:1.1;letter-spacing:-.03em;margin-bottom:10px}
+.doc-hero p{color:var(--muted);font-size:18px}
+.doc section{padding:26px 0;border-top:1px solid var(--line)}
+.doc h2{font-size:22px;letter-spacing:-.02em;margin-bottom:12px}
+.doc h3{font-size:17px;margin:18px 0 6px}
+.doc p,.doc li{color:var(--muted)}
+.doc p{margin-bottom:12px}
+.doc ul,.doc ol{padding-left:22px;margin-bottom:12px}.doc li{margin-bottom:6px}
+.doc strong{color:var(--ink)}
+.doc code,.formula{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;background:var(--surface-2);padding:2px 7px;border-radius:6px;color:var(--ink)}
+.callout{background:var(--brand-soft);border-radius:var(--radius);padding:18px 20px;color:var(--ink)}
+.callout p{color:var(--ink);margin:0}
+details{border-top:1px solid var(--line);padding:14px 0}
+details:last-of-type{border-bottom:1px solid var(--line)}
+summary{cursor:pointer;font-weight:600;color:var(--ink);list-style:none;display:flex;justify-content:space-between;gap:16px;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-size:22px;color:var(--brand);line-height:1;flex:none}
+details[open] summary::after{content:"–"}
+details p{margin:10px 0 0}
+
+footer.site p{margin:0}
+footer.site .fl{font-weight:600;color:var(--ink);margin-right:4px}
+details p{color:var(--muted)}
+.hero{padding:56px 0 24px;text-align:center}
+.hero h1{font-size:clamp(32px,6vw,46px);letter-spacing:-.03em;line-height:1.1;margin-bottom:16px}
+.lead{font-size:clamp(17px,2.6vw,20px);line-height:1.55;max-width:38em;margin:0 auto 28px}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.sec{padding:44px 0}
+.sec h2{font-size:clamp(24px,4vw,32px);letter-spacing:-.025em;line-height:1.2;margin-bottom:12px}
+.sec .sub{color:var(--muted);max-width:44em;margin-bottom:24px}
+.sec p{margin-bottom:12px}
+.sec p,.sec li{color:var(--muted)}
+.sec strong{color:var(--ink)}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.fcard{padding:22px}
+.fcard h3{font-size:18px;margin-bottom:10px}
+.fcard ul{padding-left:18px}.fcard li{margin-bottom:7px}
+.formula{display:inline-block;padding:6px 10px;margin:4px 0 10px;overflow-wrap:anywhere}
+table.t{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:15px}
+table.t th,table.t td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);color:var(--ink)}
+table.t th{font-weight:600;color:var(--muted);font-size:13px;text-transform:none}
+.tw{overflow-x:auto}
+.calc{padding:22px;margin:0 0 8px}
+.calc h2{font-size:20px;margin-bottom:4px;letter-spacing:-.02em}
+.calc .note{color:var(--muted);font-size:14px;margin-bottom:16px}
+.row{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));margin-bottom:14px}
+.calc label{display:block;font-weight:600;font-size:14px;margin-bottom:6px;color:var(--ink)}
+.calc input,.calc select{width:100%;font:inherit;font-size:16px;padding:11px 12px;border-radius:10px;border:1px solid var(--field);background:var(--bg);color:var(--ink);min-height:44px}
+.hint{font-size:13px;color:var(--muted);margin-top:4px}
+.result{margin-top:6px;background:var(--brand-soft);border-radius:12px;padding:16px 18px;color:var(--ink)}
+.result dl{display:grid;grid-template-columns:1fr auto;gap:6px 16px;margin:0}
+.result dt{color:var(--muted)}.result dd{margin:0;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.result .big{font-size:1.15em;border-top:1px solid var(--line);padding-top:8px}
+.result p{margin:0;color:var(--ink)}
+.stump{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;margin-bottom:10px}
+.btn.ghost{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1px var(--field);padding:10px 14px;font-size:14px;min-height:44px}
+.box{background:var(--brand-soft);border-radius:var(--radius);padding:20px 22px;margin:8px 0 4px}
+.box h2{margin:0 0 8px;font-size:19px}
+.box p{color:var(--ink);margin-bottom:14px}
+.crumbs{font-size:14px;color:var(--muted);margin-bottom:8px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+</style>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Tree removal cost calculator", "url": "https://rshamilton.github.io/treecostcalculator/tree-removal-cost-calculator.html", "description": "Free tree removal cost calculator. Enter trunk circumference, height, your own rate and starting fee to get the tree's volume and price. Includes the formula and a worked example.", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Any (web browser)", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isAccessibleForFree": true, "isPartOf": {"@type": "WebSite", "name": "Tree Cost Calculator", "url": "https://rshamilton.github.io/treecostcalculator/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I calculate the price to remove a tree?", "acceptedAnswer": {"@type": "Answer", "text": "Multiply the tree's volume by your rate and add a starting fee. Volume = circumference × circumference × height ÷ 12.56, so a 6 ft circumference, 50 ft tree is 143.3 cu ft; at $10 per cu ft plus a $150 starting fee that is $1,583.12 (example numbers)."}}, {"@type": "Question", "name": "Does this calculator tell me what tree removal costs in my area?", "acceptedAnswer": {"@type": "Answer", "text": "No. Rates vary by region, company and job, so you enter your own rate. The numbers on this page are examples."}}, {"@type": "Question", "name": "Can I use meters?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Choose Meters and enter circumference and height in meters. The volume is in cubic meters and the rate is per cubic meter."}}]}</script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="tcc-mark" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0.15" y1="0" x2="0.85" y2="1"><stop offset="0" stop-color="#40C67E"/><stop offset="1" stop-color="#0B5A38"/></linearGradient>
+    <linearGradient id="trunk" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#E4B078"/><stop offset="1" stop-color="#C68C52"/></linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="230" fill="url(#bg)"/>
+  <ellipse cx="512" cy="884" rx="306" ry="46" fill="#0B4D31" opacity="0.55"/>
+  <path d="M462 500 L562 500 C566 640 578 760 632 878 L392 878 C446 760 458 640 462 500 Z" fill="url(#trunk)"/>
+  <!-- canopy shade layer (offset down) -->
+  <g fill="#DCE8CF" transform="translate(0 18)">
+    <circle cx="512" cy="286" r="174"/><circle cx="348" cy="396" r="136"/><circle cx="676" cy="396" r="136"/>
+    <circle cx="402" cy="478" r="108"/><circle cx="622" cy="478" r="108"/><circle cx="512" cy="420" r="172"/>
+  </g>
+  <g fill="#FBF8EC">
+    <circle cx="512" cy="286" r="178"/><circle cx="348" cy="396" r="140"/><circle cx="676" cy="396" r="140"/>
+    <circle cx="402" cy="478" r="112"/><circle cx="622" cy="478" r="112"/><circle cx="512" cy="420" r="176"/>
+  </g>
+  <!-- tape tail -->
+  <path d="M590 716 L646 724 L656 842 L598 848 Z" fill="#F7C948" />
+  <path d="M598 848 L656 842 L658 868 L600 874 Z" fill="#D9A521" />
+  <g stroke="#5B3A05" stroke-width="6" stroke-linecap="round" opacity="0.9">
+    <line x1="606" y1="752" x2="624" y2="754"/><line x1="607" y1="782" x2="625" y2="784"/><line x1="608" y1="812" x2="626" y2="814"/>
+  </g>
+  <!-- tape band -->
+  <path d="M404 668 Q512 716 620 668 L620 748 Q512 796 404 748 Z" fill="#F7C948"/>
+  <path d="M404 668 Q512 716 620 668" fill="none" stroke="#C9931A" stroke-width="6"/>
+  <path d="M404 748 Q512 796 620 748" fill="none" stroke="#C9931A" stroke-width="6"/>
+  <g stroke="#5B3A05" stroke-width="7" stroke-linecap="round">
+    <line x1="436" y1="690" x2="436" y2="714"/><line x1="468" y1="699" x2="468" y2="726"/><line x1="500" y1="705" x2="500" y2="730"/>
+    <line x1="532" y1="705" x2="532" y2="730"/><line x1="564" y1="699" x2="564" y2="726"/><line x1="596" y1="690" x2="596" y2="714"/>
+  </g>
+</symbol></svg>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site"><div class="wrap">
+  <a class="brand" href="./" aria-label="Tree Cost Calculator home"><svg viewBox="0 0 1024 1024" aria-hidden="true"><use href="#tcc-mark"/></svg><span>Tree Cost Calculator</span></a>
+  <nav class="main" aria-label="Main"><a href="index.html#features">Features</a><a href="tree-removal-cost-calculator.html" aria-current="page">Calculators</a><a href="support.html">Support</a><a href="https://github.com/rshamilton/tcc-app">GitHub</a></nav>
+</div></header>
+<main id="main">
+
+<div class="narrow">
+  <div class="doc-hero" style="padding-bottom:16px">
+    <p class="crumbs"><a href="./">Tree Cost Calculator</a> &rsaquo; Free calculators</p>
+    <h1>Tree removal cost calculator</h1>
+    <p>How much should I charge to remove a tree? Enter the trunk circumference and height, set your own rate and starting fee, and get the volume and price. Free, runs in your browser, nothing is sent anywhere.</p>
+  </div>
+
+<form class="card calc" aria-labelledby="c-h" novalidate>
+  <h2 id="c-h">Tree removal price calculator</h2>
+  <p class="note">The values shown are examples. Replace them with your own measurements and your own rate; rates are set by you, not by this page.</p>
+  <div class="row">
+    <div><label for="unit">Units</label><select id="unit"><option value="ft">Feet (cu ft)</option><option value="m">Meters (m&sup3;)</option></select></div>
+    <div><label for="c">Trunk circumference (<span class="u">ft</span>)</label><input id="c" inputmode="decimal" autocomplete="off" value="6"></div>
+    <div><label for="h">Tree height (<span class="u">ft</span>)</label><input id="h" inputmode="decimal" autocomplete="off" value="50"></div>
+  </div>
+  <div class="row">
+    <div><label for="r">Your rate per <span class="v">cu ft</span></label><input id="r" inputmode="decimal" autocomplete="off" value="10"></div>
+    <div><label for="fee">Starting fee</label><input id="fee" inputmode="decimal" autocomplete="off" value="150"></div>
+    <div><label for="tax">Tax % (optional)</label><input id="tax" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+  </div>
+  <div class="result" id="out" role="status" aria-live="polite"></div>
+</form>
+
+</div>
+<div class="narrow doc">
+
+  <section>
+    <h2>How much should I charge to remove a tree?</h2>
+    <p>Only you can set that number: it depends on your costs, your region, the access and the hazards on each job. What this page shows is one common way to turn a tree's size into a price: <strong>price = starting fee + estimated volume &times; your rate per cubic foot (or cubic meter)</strong>. You choose the rate and the fee; this calculator does not use or quote market prices.</p>
+  </section>
+  <section>
+    <h2>What is the formula for the volume of a tree?</h2>
+    <p>The trunk is treated as a cylinder, so the volume is the circumference squared times the height, divided by 12.56:</p>
+    <p><code class="formula">volume = circumference &times; circumference &times; height &divide; 12.56</code></p>
+    <p>12.56 is 4&pi; (about 12.566). Because circumference = 2&pi; &times; radius, the formula equals &pi; &times; radius&sup2; &times; height, the volume of a cylinder. In feet the answer is cubic feet; in meters it is cubic meters.</p>
+  </section>
+  <section>
+    <h2>What is a worked example?</h2>
+    <p>A tree with a 6 ft trunk circumference and 50 ft height, priced at $10 per cubic foot with a $150 starting fee (all example numbers):</p>
+    <div class="tw"><table class="t">
+      <tr><th>Step</th><th>Calculation</th><th>Result</th></tr>
+      <tr><td>Volume</td><td>6 &times; 6 &times; 50 &divide; 12.56</td><td>143.3 cu ft</td></tr>
+      <tr><td>Volume price</td><td>143.3121 &times; $10</td><td>$1,433.12</td></tr>
+      <tr><td>Plus starting fee</td><td>$1,433.12 + $150</td><td><strong>$1,583.12</strong></td></tr>
+    </table></div>
+    <p>In meters, a 1.8 m circumference and 15 m height gives 1.8 &times; 1.8 &times; 15 &divide; 12.56 = 3.87 m&sup3;.</p>
+  </section>
+  <section>
+    <h2>Where do I measure the circumference and height?</h2>
+    <p>Wrap a tape around the trunk about 4&frac12; feet (1.4 m) above the ground and read the circumference. Measure height from the ground to the top of the tree; if you cannot reach it with a tape, use the <a href="tree-height-calculator.html">tree height calculator</a>. Use the same unit for both.</p>
+  </section>
+  <section>
+    <h2>What rate per cubic foot should I use?</h2>
+    <p>There is no single right rate. Work backwards from your own numbers: crew and equipment cost per hour, how long a typical tree of that size takes, disposal, insurance and the margin you need. Different jobs (open lawn versus a tight yard, near power lines, crane needed) justify different rates, which is why the app lets you change the rate on each estimate and add separate line items for the extra work.</p>
+  </section>
+  <section>
+    <h2>What does this calculator leave out?</h2>
+    <ul>
+      <li>It is an approximation for pricing, not a measure of lumber, firewood or biomass. A real trunk tapers and branches add volume.</li>
+      <li>It does not know about access, hazards, utility lines, permits, disposal or cleanup. Price those as extra charges.</li>
+      <li>Tax is optional and is simply your percentage applied to the price. Check your local rules.</li>
+      <li>Results are estimates. You are responsible for checking every figure before quoting it to a customer.</li>
+    </ul>
+  </section>
+  <div class="box"><h2>Do this in the app</h2><p>Tree Cost Calculator (free, iPhone and iPad) does this for every tree on a job, adds stump grinding and other line items, a discount, tax and deposit, and sends the customer a PDF estimate they can sign on your phone, then converts it to an invoice in one tap. No account, works offline, open source.</p><p style="margin:0"><a class="btn" href="https://apps.apple.com/app/id6760602763">Download on the App Store</a></p></div>
+  <section>
+    <h2>Related calculators</h2>
+    <p>Other free calculators: <a href="stump-grinding-cost-calculator.html">stump grinding cost calculator</a>, <a href="tree-height-calculator.html">tree height calculator</a>, <a href="firewood-cord-calculator.html">firewood cord calculator</a>.</p>
+  </section>
+
+  <section>
+    <h2>Frequently asked questions</h2>
+<details><summary>How do I calculate the price to remove a tree?</summary><p>Multiply the tree's volume by your rate and add a starting fee. Volume = circumference &times; circumference &times; height &divide; 12.56, so a 6 ft circumference, 50 ft tree is 143.3 cu ft; at $10 per cu ft plus a $150 starting fee that is $1,583.12 (example numbers).</p></details>
+<details><summary>Does this calculator tell me what tree removal costs in my area?</summary><p>No. Rates vary by region, company and job, so you enter your own rate. The numbers on this page are examples.</p></details>
+<details><summary>Can I use meters?</summary><p>Yes. Choose Meters and enter circumference and height in meters. The volume is in cubic meters and the rate is per cubic meter.</p></details>
+  </section>
+</div>
+
+</main>
+<footer class="site"><div class="wrap">
+  <p>&copy; 2026 Ryan Hamilton &middot; Free and open-source software (GNU GPL v3)</p>
+  <nav aria-label="Footer"><a href="./">Home</a><a href="support.html">Support</a><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms of Use</a><a href="https://apps.apple.com/app/id6760602763">App Store</a><a href="https://github.com/rshamilton/tcc-app">GitHub</a><a href="mailto:treecostcalculator@googlegroups.com">treecostcalculator@googlegroups.com</a></nav>
+  <nav aria-label="Calculators"><span class="fl">Free calculators:</span><a href="tree-removal-cost-calculator.html">Tree removal cost calculator</a><a href="stump-grinding-cost-calculator.html">Stump grinding cost calculator</a><a href="tree-height-calculator.html">Tree height calculator</a><a href="firewood-cord-calculator.html">Firewood cord calculator</a></nav>
+</div></footer>
+<script>
+function g(id){return document.getElementById(id)}
+function num(id){var v=g(id).value.trim().replace(/,/g,'.');if(v==='')return NaN;var x=Number(v);return isFinite(x)?x:NaN}
+function fmt(x,d){return x.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d})}
+function r2(x){return Math.round(x*100)/100}
+document.addEventListener('submit',function(e){e.preventDefault()});
+
+var unitEl=g('unit');
+function calc(){
+  var m=unitEl.value==='m',u=m?'m':'ft',v=m?'m\u00b3':'cu ft';
+  document.querySelectorAll('.u').forEach(function(e){e.textContent=u});
+  document.querySelectorAll('.v').forEach(function(e){e.textContent=v});
+  var c=num('c'),h=num('h'),r=num('r'),fee=num('fee'),t=num('tax'),out=g('out');
+  if(!(c>0)||!(h>0)||!(r>=0)){out.innerHTML='<p>Enter a circumference, a height and your rate to see the price.</p>';return}
+  if(isNaN(fee))fee=0; if(isNaN(t))t=0;
+  var vol=c*c*h/12.56, price=r2(fee+vol*r), tax=Math.round(price*t)/100, total=r2(price+tax);
+  var s='<dl><dt>Estimated volume</dt><dd>'+fmt(vol,1)+' '+v+'</dd><dt>Volume price</dt><dd>'+fmt(r2(vol*r),2)+'</dd><dt>Starting fee</dt><dd>'+fmt(fee,2)+'</dd><dt>Tree price</dt><dd>'+fmt(price,2)+'</dd>';
+  if(t>0)s+='<dt>Tax ('+fmt(t,2)+'%)</dt><dd>'+fmt(tax,2)+'</dd><dt class="big">Total with tax</dt><dd class="big">'+fmt(total,2)+'</dd>';
+  else s+='<dt class="big">Total</dt><dd class="big">'+fmt(price,2)+'</dd>';
+  out.innerHTML=s+'</dl>';
+}
+document.addEventListener('input',calc);document.addEventListener('change',calc);calc();
+
+</script>
+</body>
+</html>
