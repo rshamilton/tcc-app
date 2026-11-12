@@ -1,0 +1,42 @@
+# Captures App Store screenshots (testAppStoreScreenshots) on the sizes App Store Connect needs:
+# 6.9" iPhone (1320 x 2868) and 13" iPad (2064 x 2752). Run it from the Actions tab.
+name: App Store Screenshots
+
+on:
+  workflow_dispatch:
+
+jobs:
+  capture:
+    runs-on: macos-26
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ["iPhone 17 Pro Max", "iPad Pro 13-inch (M5)"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_2[6-9]*.app | grep -v -i beta | sort -V | tail -1)" && xcodebuild -version
+      - name: Boot simulator with a clean status bar
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(sorted([(k,x['udid']) for k,v in d.items() if 'iOS' in k for x in v if x['name']=='${{ matrix.device }}'])[-1][1])")
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time 9:41 --dataNetwork wifi --wifiBars 3 --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
+      - name: Capture
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/store"
+          TEST_RUNNER_STORE_DIR="$RUNNER_TEMP/store" xcodebuild test \
+            -project "Tree Cost Calculator.xcodeproj" -scheme "Tree Cost Calculator" -testPlan TreeCostCalculator \
+            -destination "id=$UDID" -parallel-testing-enabled NO \
+            -only-testing:"Tree Cost CalculatorUITests/TreeCostCalculatorUITests/testAppStoreScreenshots" \
+            CODE_SIGNING_ALLOWED=NO | tail -100
+          ls -la "$RUNNER_TEMP/store"
+          sips -g pixelWidth -g pixelHeight "$RUNNER_TEMP"/store/*.png | grep pixel | sort | uniq -c
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.device }}
+          path: ${{ runner.temp }}/store/*.png
+          retention-days: 30

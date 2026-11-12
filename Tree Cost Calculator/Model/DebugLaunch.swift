@@ -11,7 +11,7 @@ import UIKit
 ///
 ///   -resetOnboarding     show onboarding again
 ///   -resetData           delete all estimates
-///   -demoData            replace all estimates with sample data
+///   -demoData            replace all estimates with sample data (includes a part-paid invoice and a signed estimate)
 ///   -openEstimate N      push the Nth estimate (0 = newest) on launch
 ///   -showSettings        present Settings on launch
 ///   -showPreview         open the PDF preview when the editor appears
@@ -55,6 +55,8 @@ nonisolated enum DebugLaunch {
         if has("-resetData") {
             for e in store.estimates { store.delete(id: e.id) }
             UserDefaults.standard.set(1, forKey: SettingsKey.nextNumber)
+            // Back to the unpriced starter list, so a earlier demo run's prices don't leak into tests.
+            UserDefaults.standard.set(ServiceList(items: ServiceList.starter).rawValue, forKey: SettingsKey.services)
             store.flush()
         }
         guard has("-demoData") else { return }
@@ -74,6 +76,45 @@ nonisolated enum DebugLaunch {
             TaxRegion(name: "Texas", rate: 6.25, license: "TX-TCLB-90211"),
             TaxRegion(name: "Oklahoma", rate: 4.5, license: "")
         ]).rawValue, forKey: SettingsKey.taxRegions)
+
+        UserDefaults.standard.set(ServiceList(items: [
+            ServiceItem(name: "Stump grinding", unit: "in", unitPrice: 3, minimum: 100),
+            ServiceItem(name: "Trimming / pruning", unit: "tree", unitPrice: 150),
+            ServiceItem(name: "Haul away debris", unit: "load", unitPrice: 85),
+            ServiceItem(name: "Crew labor", unit: "hr", unitPrice: 95),
+            ServiceItem(name: "Crane / bucket truck", unit: "hr", unitPrice: 250),
+            ServiceItem(name: "Emergency / storm call-out", unit: "", unitPrice: 200)
+        ]).rawValue, forKey: SettingsKey.services)
+
+        // A handwritten-looking customer signature.
+        func signaturePNG() -> Data? {
+            let format = UIGraphicsImageRendererFormat(); format.scale = 2; format.opaque = true
+            let img = UIGraphicsImageRenderer(size: CGSize(width: 600, height: 200), format: format).image { ctx in
+                UIColor.white.setFill(); ctx.fill(CGRect(x: 0, y: 0, width: 600, height: 200))
+                UIColor.black.setStroke()
+                func stroke(_ build: (UIBezierPath) -> Void) {
+                    let p = UIBezierPath(); build(p)
+                    p.lineWidth = 3; p.lineCapStyle = .round; p.lineJoinStyle = .round; p.stroke()
+                }
+                // "P" with a big loop, then a flowing run of letters and an underline flourish.
+                stroke { p in
+                    p.move(to: CGPoint(x: 70, y: 150)); p.addCurve(to: CGPoint(x: 95, y: 40), controlPoint1: CGPoint(x: 60, y: 110), controlPoint2: CGPoint(x: 80, y: 60))
+                    p.addCurve(to: CGPoint(x: 130, y: 85), controlPoint1: CGPoint(x: 150, y: 20), controlPoint2: CGPoint(x: 170, y: 80))
+                    p.addCurve(to: CGPoint(x: 100, y: 95), controlPoint1: CGPoint(x: 115, y: 105), controlPoint2: CGPoint(x: 100, y: 100))
+                }
+                stroke { p in
+                    p.move(to: CGPoint(x: 120, y: 100)); p.addCurve(to: CGPoint(x: 210, y: 105), controlPoint1: CGPoint(x: 140, y: 70), controlPoint2: CGPoint(x: 170, y: 150))
+                    p.addCurve(to: CGPoint(x: 270, y: 95), controlPoint1: CGPoint(x: 230, y: 70), controlPoint2: CGPoint(x: 250, y: 140))
+                    p.addCurve(to: CGPoint(x: 340, y: 110), controlPoint1: CGPoint(x: 290, y: 50), controlPoint2: CGPoint(x: 310, y: 150))
+                    p.addCurve(to: CGPoint(x: 420, y: 80), controlPoint1: CGPoint(x: 365, y: 70), controlPoint2: CGPoint(x: 380, y: 130))
+                    p.addCurve(to: CGPoint(x: 500, y: 100), controlPoint1: CGPoint(x: 450, y: 40), controlPoint2: CGPoint(x: 470, y: 125))
+                }
+                stroke { p in
+                    p.move(to: CGPoint(x: 60, y: 160)); p.addCurve(to: CGPoint(x: 540, y: 140), controlPoint1: CGPoint(x: 220, y: 175), controlPoint2: CGPoint(x: 400, y: 120))
+                }
+            }
+            return img.pngData()
+        }
 
         // Illustrative sample photos: a simple tree scene in a few moods.
         func photo(_ hue: CGFloat) -> UUID? {
@@ -133,6 +174,7 @@ nonisolated enum DebugLaunch {
         // Oldest first, since new estimates are inserted at the top.
         var third = store.createEstimate()
         third.customerName = "Marcus Lee"
+        third.title = "Leaning pine"
         third.address = "9 Birch Lane"
         third.trees = [TreeItem(label: "Leaning pine", circumference: 4.5, height: 45)]
         third.status = .declined
@@ -140,6 +182,7 @@ nonisolated enum DebugLaunch {
 
         var second = store.createEstimate()
         second.customerName = "Priya Raman"
+        second.title = "Backyard maple and ash"
         second.customerPhone = "(555) 010-7781"
         second.address = "210 Harbor View Dr, Springfield"
         second.trees = [
@@ -148,13 +191,22 @@ nonisolated enum DebugLaunch {
         ]
         second.status = .approved
         second.discount = Adjustment(amount: 10, kind: .percent)
-        second.surcharge = Adjustment(amount: 275, kind: .fixed)
-        second.surchargeLabel = "Stump grinding"
+        second.lineItems = [
+            LineItem(name: "Stump grinding – Tree 1", quantity: 28, unit: "in", unitPrice: 3, minimum: 100),
+            LineItem(name: "Haul away debris", quantity: 2, unit: "load", unitPrice: 85)
+        ]
+        second.deposit = Adjustment(amount: 25, kind: .percent)
+        if let png = signaturePNG(), let sig = PhotoStore.save(png) {
+            second.signatureID = sig
+            second.signedName = "Priya Raman"
+            second.signedAt = ago(days: 3)
+        }
         second.notes = "Gate code 4471. Keep clear of the pool fence.\nHaul away all debris and chip the small limbs."
         finish(second, created: ago(days: 5), updated: ago(days: 3))
 
         var fourth = store.createEstimate()
         fourth.customerName = "Sam Okafor"
+        fourth.title = "Storm-damaged elm"
         fourth.address = "77 Cedar Court"
         fourth.trees = [TreeItem(label: "Storm-damaged elm", circumference: 5.5, height: 42)]
         fourth.status = .approved
@@ -162,6 +214,7 @@ nonisolated enum DebugLaunch {
 
         var fifth = store.createEstimate()
         fifth.customerName = "Lena Ortiz"
+        fifth.title = "Oak and cedar removal"
         fifth.address = "14 Willow Way"
         fifth.trees = [TreeItem(label: "Front yard oak", circumference: 8.0, height: 60), TreeItem(label: "Two small cedars", circumference: 2.5, height: 22)]
         fifth.status = .sent
@@ -169,6 +222,7 @@ nonisolated enum DebugLaunch {
 
         var first = store.createEstimate()
         first.customerName = "Jordan Ellis"
+        first.title = "Front yard oak and maples"
         first.customerPhone = "(555) 012-4408"
         first.customerEmail = "jordan.ellis@example.com"
         first.address = "42 Oak Street, Springfield"
@@ -186,10 +240,11 @@ nonisolated enum DebugLaunch {
         first.notes = "Customer wants the wood left on site."
         finish(first, created: ago(hours: 5), updated: ago(hours: 2))
 
-        // -invoiceDemo: an approved job turned into a part-paid invoice with other work (for checking the invoice PDF).
-        if has("-invoiceDemo") {
+        // An approved job turned into a part-paid invoice with other work (also shows the invoice PDF).
+        do {
             var invoice = store.createEstimate()
             invoice.customerName = "Dana Whitfield"
+            invoice.title = "Dead ash removal"
             invoice.address = "5 Elm Row, Springfield"
             invoice.trees = [TreeItem(label: "Dead white ash", circumference: 5.0, height: 48)]
             invoice.lineItems = [
@@ -201,7 +256,7 @@ nonisolated enum DebugLaunch {
             invoice.status = .invoiced
             invoice.amountPaid = 500
             invoice.notes = "Thank you for your business."
-            finish(invoice, created: ago(days: 1), updated: ago(hours: 1))
+            finish(invoice, created: ago(days: 6), updated: ago(days: 4))
             UserDefaults.standard.set("Check payable to Oakridge Tree Service, or card on site.", forKey: SettingsKey.paymentInstructions)
         }
         store.flush()

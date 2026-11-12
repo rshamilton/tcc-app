@@ -1,0 +1,41 @@
+# Runs every UI test (the TreeCostCalculator test plan) on an iPhone and an iPad simulator.
+# Pushes to main are tested by the Xcode Cloud workflow "Test All Features"; this covers pull requests
+# (including ones from forks, which Xcode Cloud doesn't build) and manual runs.
+name: UI Tests
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ui-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-26
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ["iPhone 17 Pro Max", "iPad Pro 13-inch (M5)"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_2[6-9]*.app | grep -v -i beta | sort -V | tail -1)" && xcodebuild -version
+      - name: Test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project "Tree Cost Calculator.xcodeproj" -scheme "Tree Cost Calculator" -testPlan TreeCostCalculator \
+            -destination "platform=iOS Simulator,name=${{ matrix.device }},OS=latest" \
+            -parallel-testing-enabled NO -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO | tail -200
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.device }}
+          path: TestResults.xcresult
+          retention-days: 14

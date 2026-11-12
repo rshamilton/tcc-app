@@ -397,7 +397,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Jordan Ellis"].exists)
         app.buttons["New Estimate"].tap()
         XCTAssertTrue(app.buttons["Next field"].waitForExistence(timeout: 10))
-        XCTAssertTrue(editorTitle("EST-0006").exists)
+        XCTAssertTrue(editorTitle("EST-0007").exists)
     }
 
     // MARK: - Backup and restore
@@ -413,12 +413,12 @@ final class TreeCostCalculatorUITests: XCTestCase {
         let fm = FileManager.default
         let deadline = Date().addingTimeInterval(30)
         func count(_ folder: String) -> Int { ((try? fm.contentsOfDirectory(atPath: dir.appendingPathComponent(folder).path)) ?? []).count }
-        while Date() < deadline, !(fm.fileExists(atPath: dir.appendingPathComponent("Settings.json").path) && count("Estimates") == 5 && count("Photos") == 4) {
+        while Date() < deadline, !(fm.fileExists(atPath: dir.appendingPathComponent("Settings.json").path) && count("Estimates") == 6 && count("Photos") == 5) {
             sleep(1)
         }
         XCTAssertTrue(fm.fileExists(atPath: dir.appendingPathComponent("Settings.json").path), "No settings in the backup")
-        XCTAssertEqual(count("Estimates"), 5)
-        XCTAssertEqual(count("Photos"), 4)
+        XCTAssertEqual(count("Estimates"), 6)
+        XCTAssertEqual(count("Photos"), 5)
         app.terminate()
         return dir
     }
@@ -513,17 +513,30 @@ final class TreeCostCalculatorUITests: XCTestCase {
 
     // MARK: - App Store screenshots
 
-    /// Writes App Store screenshots to STORE_DIR (skipped otherwise). Run on the iPhone 6.9" and iPad 13" simulators.
+    /// Writes App Store screenshots to STORE_DIR (skipped otherwise): `iphone-NN-name.png`, portrait.
     func testAppStoreScreenshots() throws {
         guard let dir = ProcessInfo.processInfo.environment["STORE_DIR"] else { throw XCTSkip("Only runs when STORE_DIR is set") }
         XCUIDevice.shared.orientation = .portrait
         let device = isPad ? "ipad" : "iphone"
         func store(_ name: String) {
-            sleep(1)
+            if app.keyboards.count > 0, app.buttons["Done"].firstMatch.exists { app.buttons["Done"].firstMatch.tap() }
+            sleep(2)
             let shot = XCUIScreen.main.screenshot()
             try? shot.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(device)-\(name).png"))
         }
-        func scroll(_ times: Int) { for _ in 0..<times { app.swipeUp(velocity: .slow) } }
+        func text(_ s: String) -> XCUIElement { app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", s)).firstMatch }
+        /// Scrolls so the element's top sits near the top of the screen, below the navigation bar.
+        func bringToTop(_ element: XCUIElement) {
+            reveal(element)
+            for _ in 0..<5 {
+                let delta = element.frame.minY - 135
+                if abs(delta) < 25 { break }
+                let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
+                let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55 - delta / app.frame.height))
+                from.press(forDuration: 0.1, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.6)
+                sleep(1)
+            }
+        }
 
         launch(["-demoData"])
         XCTAssertTrue(app.staticTexts["Jordan Ellis"].waitForExistence(timeout: 8))
@@ -533,29 +546,59 @@ final class TreeCostCalculatorUITests: XCTestCase {
         app.staticTexts["Priya Raman"].tap()
         XCTAssertTrue(editorTitle("EST-0002").waitForExistence(timeout: 5))
         sleep(1)
-        store("02-trees-and-photos")
-        scroll(1)
-        store("03-customer-and-pricing")
-        scroll(1)
+        store("02-estimate-top")
+
+        let otherWork = app.staticTexts["OTHER WORK"].firstMatch.exists ? app.staticTexts["OTHER WORK"].firstMatch : app.staticTexts["Other Work"].firstMatch
+        for _ in 0..<8 where !otherWork.exists { app.swipeUp() }
+        bringToTop(otherWork)
+        store("03-other-work")
+
+        let signedBy = text("Signed by")
+        // Start the shot at the Summary heading so every price line (tree removal, other work, …) is visible.
+        let summary = app.staticTexts["SUMMARY"].firstMatch.exists ? app.staticTexts["SUMMARY"].firstMatch : app.staticTexts["Summary"].firstMatch
+        for _ in 0..<10 where !summary.exists { app.swipeUp() }
+        bringToTop(summary)
         store("04-summary")
 
-        app.buttons["Preview & Share"].tap()
+        for _ in 0..<8 where !signedBy.exists { app.swipeUp() }
+        reveal(signedBy)
+        for _ in 0..<2 {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)))
+        }
+        store("05-signature")
+
+        app.buttons["previewShareButton"].tap()
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 6))
         sleep(3)
-        store("05-pdf-estimate")
-        app.swipeUp(velocity: .slow)
-        store("06-pdf-signature")
+        store("06-pdf-estimate")
         app.buttons["Done"].tap()
         sleep(2)
-
         if !isPad { app.navigationBars.buttons.firstMatch.tap() }
+
+        // The invoice (Dana Whitfield, "Dead ash removal").
+        app.staticTexts["Dana Whitfield"].tap()
+        XCTAssertTrue(app.buttons["Invoice & Share"].waitForExistence(timeout: 5))
+        app.buttons["Invoice & Share"].tap()
+        XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 6))
+        sleep(3)
+        store("07-pdf-invoice")
+        app.buttons["Done"].tap()
+        sleep(2)
+        if !isPad { app.navigationBars.buttons.firstMatch.tap() }
+
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 4))
-        store("07-settings")
-        scroll(1)
-        store("08-tax-regions")
-        scroll(2)
-        store("09-your-data")
+        let services = text("Services & Prices")
+        for _ in 0..<10 where !services.exists { app.swipeUp() }
+        reveal(services)
+        services.tap()
+        XCTAssertTrue(app.navigationBars["Services & Prices"].waitForExistence(timeout: 5))
+        store("08-services")
+        app.navigationBars["Services & Prices"].buttons.firstMatch.tap()
+
+        for _ in 0..<3 { app.swipeDown() }
+        store("09-settings")
     }
 
     // MARK: - Screens for visual review
