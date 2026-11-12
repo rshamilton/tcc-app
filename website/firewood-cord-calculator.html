@@ -7,8 +7,8 @@
 <meta name="description" content="Free firewood cord calculator. Enter stack length, height and depth to get full cords, face cords and cubic meters, with an optional price per cord. A cord is 128 cubic feet.">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#1e8a4a">
-<link rel="canonical" href="https://rshamilton.github.io/treecostcalculator/firewood-cord-calculator.html">
-<meta property="og:url" content="https://rshamilton.github.io/treecostcalculator/firewood-cord-calculator.html">
+<link rel="canonical" href="https://rshamilton.github.io/tcc-app/firewood-cord-calculator.html">
+<meta property="og:url" content="https://rshamilton.github.io/tcc-app/firewood-cord-calculator.html">
 <meta property="og:title" content="Firewood Cord Calculator: cords, face cords and cubic meters">
 <meta property="og:description" content="Free firewood cord calculator. Enter stack length, height and depth to get full cords, face cords and cubic meters, with an optional price per cord. A cord is 128 cubic feet.">
 <meta property="og:type" content="website">
@@ -128,7 +128,7 @@ table.t th{font-weight:600;color:var(--muted);font-size:13px;text-transform:none
 .crumbs{font-size:14px;color:var(--muted);margin-bottom:8px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 </style>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Firewood cord calculator", "url": "https://rshamilton.github.io/treecostcalculator/firewood-cord-calculator.html", "description": "Free firewood cord calculator. Enter stack length, height and depth to get full cords, face cords and cubic meters, with an optional price per cord. A cord is 128 cubic feet.", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Any (web browser)", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isAccessibleForFree": true, "isPartOf": {"@type": "WebSite", "name": "Tree Cost Calculator", "url": "https://rshamilton.github.io/treecostcalculator/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Firewood cord calculator", "url": "https://rshamilton.github.io/tcc-app/firewood-cord-calculator.html", "description": "Free firewood cord calculator. Enter stack length, height and depth to get full cords, face cords and cubic meters, with an optional price per cord. A cord is 128 cubic feet.", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Any (web browser)", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isAccessibleForFree": true, "isPartOf": {"@type": "WebSite", "name": "Tree Cost Calculator", "url": "https://rshamilton.github.io/tcc-app/"}}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How many cubic feet are in a cord of firewood?", "acceptedAnswer": {"@type": "Answer", "text": "128 cubic feet of stacked wood: 4 ft high × 4 ft deep × 8 ft long."}}, {"@type": "Question", "name": "How much is a face cord compared with a full cord?", "acceptedAnswer": {"@type": "Answer", "text": "A face cord of 16-inch pieces (4 ft × 8 ft × 16 in) is 42.67 cubic feet, one third of a full cord. The term varies by region, so confirm the piece length."}}, {"@type": "Question", "name": "How do I convert a stack to cords?", "acceptedAnswer": {"@type": "Answer", "text": "Multiply length × height × depth in feet and divide by 128. Enter the three measurements above and the calculator does it for you."}}]}</script>
 </head>
 <body>
@@ -191,6 +191,7 @@ table.t th{font-weight:600;color:var(--muted);font-size:13px;text-transform:none
     <div><label for="p">Price per full cord (optional)</label><input id="p" inputmode="decimal" autocomplete="off" placeholder="your price"></div>
   </div>
   <div class="result" id="out" role="status" aria-live="polite"></div>
+  <p class="hint">Estimates only &mdash; see <a href="terms.html">Terms</a>.</p>
 </form>
 
 </div>
@@ -234,6 +235,7 @@ table.t th{font-weight:600;color:var(--muted);font-size:13px;text-transform:none
 </main>
 <footer class="site"><div class="wrap">
   <p>&copy; 2026 Ryan Hamilton &middot; Free and open-source software (GNU GPL v3)</p>
+  <p>Provided as is, without warranty. Results are estimates. See <a href="terms.html">Terms of Use</a>.</p>
   <nav aria-label="Footer"><a href="./">Home</a><a href="support.html">Support</a><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms of Use</a><a href="https://apps.apple.com/app/id6760602763">App Store</a><a href="https://github.com/rshamilton/tcc-app">GitHub</a><a href="mailto:treecostcalculator@googlegroups.com">treecostcalculator@googlegroups.com</a></nav>
   <nav aria-label="Calculators"><span class="fl">Free calculators:</span><a href="tree-removal-cost-calculator.html">Tree removal cost calculator</a><a href="stump-grinding-cost-calculator.html">Stump grinding cost calculator</a><a href="tree-height-calculator.html">Tree height calculator</a><a href="firewood-cord-calculator.html">Firewood cord calculator</a></nav>
 </div></footer>

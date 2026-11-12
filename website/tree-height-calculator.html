@@ -7,8 +7,8 @@
 <meta name="description" content="Free tree height calculator using the tangent method and a phone clinometer: distance times tan(angle) plus eye height. Also converts trunk circumference to diameter (DBH).">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#1e8a4a">
-<link rel="canonical" href="https://rshamilton.github.io/treecostcalculator/tree-height-calculator.html">
-<meta property="og:url" content="https://rshamilton.github.io/treecostcalculator/tree-height-calculator.html">
+<link rel="canonical" href="https://rshamilton.github.io/tcc-app/tree-height-calculator.html">
+<meta property="og:url" content="https://rshamilton.github.io/tcc-app/tree-height-calculator.html">
 <meta property="og:title" content="Tree Height Calculator: measure tree height with a phone, plus DBH">
 <meta property="og:description" content="Free tree height calculator using the tangent method and a phone clinometer: distance times tan(angle) plus eye height. Also converts trunk circumference to diameter (DBH).">
 <meta property="og:type" content="website">
@@ -128,7 +128,7 @@ table.t th{font-weight:600;color:var(--muted);font-size:13px;text-transform:none
 .crumbs{font-size:14px;color:var(--muted);margin-bottom:8px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 </style>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Tree height calculator", "url": "https://rshamilton.github.io/treecostcalculator/tree-height-calculator.html", "description": "Free tree height calculator using the tangent method and a phone clinometer: distance times tan(angle) plus eye height. Also converts trunk circumference to diameter (DBH).", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Any (web browser)", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isAccessibleForFree": true, "isPartOf": {"@type": "WebSite", "name": "Tree Cost Calculator", "url": "https://rshamilton.github.io/treecostcalculator/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Tree height calculator", "url": "https://rshamilton.github.io/tcc-app/tree-height-calculator.html", "description": "Free tree height calculator using the tangent method and a phone clinometer: distance times tan(angle) plus eye height. Also converts trunk circumference to diameter (DBH).", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Any (web browser)", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isAccessibleForFree": true, "isPartOf": {"@type": "WebSite", "name": "Tree Cost Calculator", "url": "https://rshamilton.github.io/tcc-app/"}}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I calculate the height of a tree?", "acceptedAnswer": {"@type": "Answer", "text": "Stand a measured distance from the tree on level ground, measure the angle to the top, and compute height = distance × tan(angle) + your eye height. For 50 ft, 55° and 5.5 ft eye height that is about 76.9 ft."}}, {"@type": "Question", "name": "Can a phone measure tree height?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, approximately. A phone's tilt sensor can act as a clinometer to read the angle to the top of the tree; combine it with a measured distance using the tangent formula. Expect estimates, not survey-grade results."}}, {"@type": "Question", "name": "How do I find tree diameter from circumference?", "acceptedAnswer": {"@type": "Answer", "text": "Divide the circumference by π (3.14159). A 37.7 inch circumference is about a 12.0 inch diameter."}}]}</script>
 </head>
 <body>
@@ -191,6 +191,7 @@ table.t th{font-weight:600;color:var(--muted);font-size:13px;text-transform:none
     <div><label for="eye">Eye height (<span class="u">ft</span>)</label><input id="eye" inputmode="decimal" autocomplete="off" value="5.5"><p class="hint">Used only when the base angle is blank.</p></div>
   </div>
   <div class="result" id="out" role="status" aria-live="polite"></div>
+  <p class="hint">Estimates only &mdash; see <a href="terms.html">Terms</a>.</p>
 </form>
 
 <form class="card calc" aria-labelledby="d-h" novalidate>
@@ -201,6 +202,7 @@ table.t th{font-weight:600;color:var(--muted);font-size:13px;text-transform:none
     <div><label for="cu">Unit</label><select id="cu"><option value="in">Inches</option><option value="cm">Centimeters</option><option value="ft">Feet</option><option value="m">Meters</option></select></div>
   </div>
   <div class="result" id="out2" role="status" aria-live="polite"></div>
+  <p class="hint">Estimates only &mdash; see <a href="terms.html">Terms</a>.</p>
 </form>
 
 </div>
@@ -251,6 +253,7 @@ table.t th{font-weight:600;color:var(--muted);font-size:13px;text-transform:none
 </main>
 <footer class="site"><div class="wrap">
   <p>&copy; 2026 Ryan Hamilton &middot; Free and open-source software (GNU GPL v3)</p>
+  <p>Provided as is, without warranty. Results are estimates. See <a href="terms.html">Terms of Use</a>.</p>
   <nav aria-label="Footer"><a href="./">Home</a><a href="support.html">Support</a><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms of Use</a><a href="https://apps.apple.com/app/id6760602763">App Store</a><a href="https://github.com/rshamilton/tcc-app">GitHub</a><a href="mailto:treecostcalculator@googlegroups.com">treecostcalculator@googlegroups.com</a></nav>
   <nav aria-label="Calculators"><span class="fl">Free calculators:</span><a href="tree-removal-cost-calculator.html">Tree removal cost calculator</a><a href="stump-grinding-cost-calculator.html">Stump grinding cost calculator</a><a href="tree-height-calculator.html">Tree height calculator</a><a href="firewood-cord-calculator.html">Firewood cord calculator</a></nav>
 </div></footer>

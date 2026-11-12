@@ -214,7 +214,7 @@ private struct SetupPage: View {
 
                 VStack(spacing: 10) {
                     Label("Free, no ads, no account. Your data is saved on your device and backed up to your own iCloud Drive. We never receive it.", systemImage: "lock.fill")
-                    Text("All prices, volumes and tax figures are estimates and examples only, worked out from what you enter. Check everything yourself: the app's maker accepts no responsibility for estimates, jobs, taxes or data.")
+                    Text("By using Tree Cost Calculator you agree to the [Terms of Use](https://rshamilton.github.io/tcc-app/terms) and [Disclaimer](https://rshamilton.github.io/tcc-app/terms). Everything it calculates is an estimate you must check; you are solely responsible for your prices, documents, taxes, work and data.")
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)

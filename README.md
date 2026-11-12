@@ -5,7 +5,7 @@ and height into a priced tree removal estimate, then sends it to the customer as
 No ads, no subscription, no account, works offline, and the code is open source under the GNU GPL v3.
 
 [Download on the App Store](https://apps.apple.com/app/id6760602763) ·
-[Website](https://rshamilton.github.io/treecostcalculator/) ·
+[Website](https://rshamilton.github.io/tcc-app/) ·
 [Report a bug or suggest a feature](https://github.com/rshamilton/tcc-app/issues)
 
 ![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg) ![Platform: iOS 17+](https://img.shields.io/badge/iOS-17%2B-lightgrey.svg) ![Swift](https://img.shields.io/badge/Swift-SwiftUI-orange.svg)
@@ -116,7 +116,7 @@ xcodebuild test -project "Tree Cost Calculator.xcodeproj" -scheme "Tree Cost Cal
 | --- | --- |
 | `Tree Cost Calculator/` | The iOS app (SwiftUI, iOS 17+, iPhone and iPad). |
 | `Tree Cost CalculatorUITests/` | UI tests for the main flows. |
-| `website/` | The public website (plain HTML, no build step), published from `rshamilton/treecostcalculator` with GitHub Pages. |
+| `website/` | The public website (plain HTML, no build step), published to https://rshamilton.github.io/tcc-app/ by the GitHub Pages workflow on every push to `main`. |
 | `Config/` | The iCloud entitlements file and the Info.plist additions. |
 
 Inside the app:
@@ -134,6 +134,35 @@ Inside the app:
 
 Bug reports and feature requests are welcome in [Issues](https://github.com/rshamilton/tcc-app/issues). Pull requests
 are welcome too; please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
+
+## Disclaimer
+
+"The Developer" means the app's authors, copyright holders and contributors (including Ryan Hamilton), its App Store
+seller and publisher (Susan Hamilton), and anyone acting for them.
+
+- **As is.** Tree Cost Calculator is provided "AS IS" and "AS AVAILABLE", without warranties of any kind, including
+  merchantability, fitness for a particular purpose, accuracy, non-infringement, or uninterrupted or error-free operation.
+- **Estimates only.** Every calculation, volume, diameter, price, tax, total, deposit and balance is an estimate worked out
+  from numbers you enter, and may be wrong.
+- **No advice.** Nothing here is professional, arborist, engineering, safety, legal, tax, accounting, financial or insurance advice.
+- **You are responsible** for checking every figure and document; your prices; every quote, contract, invoice and set of
+  terms you send; your agreements with customers; whether an on-screen signature is legally valid where you work; taxes;
+  licensing, permits and insurance; compliance with all laws (consumer protection, contractor, privacy, tax); the safety of
+  any tree work (tree work is dangerous, so hire qualified professionals); and backing up your data. You are also
+  responsible for your own privacy obligations to your customers.
+- **No liability.** To the fullest extent permitted by law, the Developer is not liable for any loss or damage, whether
+  direct, indirect, incidental, consequential, special or punitive, including lost profits, revenue, data or business,
+  property damage, injury or death from tree work, mispriced jobs, disputes, tax penalties, data loss (including iCloud
+  sync or restore failures), or device or third-party service failures, even if told of the possibility. Total aggregate
+  liability is limited to the amount paid for the app (zero) or, where a minimum is required by law, the lowest amount allowed.
+- **Indemnity.** You agree to indemnify the Developer against claims arising from your use of the app, your estimates,
+  invoices or work, your customers, or your breach of these terms.
+- **Third parties.** Apple, iCloud, email and share targets, GitHub and other services are governed by their own terms.
+- **Source code.** Sections 15 and 16 of the GNU GPL v3 ("Disclaimer of Warranty" and "Limitation of Liability") also apply.
+- **Where the law differs.** Where a jurisdiction does not allow certain exclusions, they apply to the fullest extent
+  permitted; if any part is unenforceable, the rest still applies.
+- **Acceptance.** Using the app means you accept this disclaimer and the
+  [Terms of Use](https://rshamilton.github.io/tcc-app/terms), which may change. If you do not agree, do not use the app.
 
 ## License
 
@@ -155,4 +184,4 @@ The names "Tree Cost Calculator" and "TCC" and the app icon identify the officia
 please give it a different name and icon so users can tell them apart.
 
 Prices, volumes, diameters, tax rates and every other figure the app produces are estimates and examples only.
-See the [Terms of Use](https://rshamilton.github.io/treecostcalculator/terms).
+See the [Disclaimer](#disclaimer) and the [Terms of Use](https://rshamilton.github.io/tcc-app/terms).

@@ -107,6 +107,7 @@ struct SettingsView: View {
                 switch page {
                 case .services: ServicesSettingsView()
                 case .about: AboutView()
+                case .disclaimer: DisclaimerView()
                 }
             }
             .sheet(item: $exportFile) { file in
@@ -425,6 +426,9 @@ struct SettingsView: View {
             ShareLink(item: AppLinks.appStore, message: Text("A free tree removal estimate app for iPhone and iPad")) {
                 Label("Share the App", systemImage: "square.and.arrow.up")
             }
+            NavigationLink(value: SettingsPage.disclaimer) {
+                Label("Disclaimer & Terms", systemImage: "exclamationmark.shield")
+            }
         }
     }
 
@@ -442,7 +446,7 @@ struct SettingsView: View {
         } header: {
             Text("About")
         } footer: {
-            Text("Prices, volumes, tax rates and every other figure in this app are calculated from what you enter and are estimates and examples only. They can be wrong or out of date. You are responsible for checking everything, and the app's maker accepts no responsibility or liability for estimates, jobs, taxes or data. See the Terms of Use.\n\nThe developer never receives your data.\n\n© 2026 Ryan Hamilton. Free and open-source software under the GNU GPL v3.")
+            Text("Provided \"as is\", without warranty of any kind. Prices, volumes, taxes and every other figure are estimates worked out from what you enter, and may be wrong. This is not professional, legal, tax or safety advice. You are solely responsible for checking everything, for your prices, documents, taxes, work and data, and for backing up your data. The Developer (the app's authors, contributors and publisher) is not liable for any loss or damage. By using the app you accept the Disclaimer & Terms and the Terms of Use.\n\nThe developer never receives your data.\n\n© 2026 Ryan Hamilton. Free and open-source software under the GNU GPL v3.")
         }
     }
 }
@@ -451,6 +455,7 @@ struct SettingsView: View {
 private enum SettingsPage: Hashable {
     case services
     case about
+    case disclaimer
 }
 
 /// A file ready to share (Identifiable so a sheet can present it).

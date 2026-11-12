@@ -7,10 +7,10 @@ import Foundation
 
 /// Every web address and contact the app shows. The website and the source code are public.
 enum AppLinks {
-    static let website = URL(string: "https://rshamilton.github.io/treecostcalculator/")!
-    static let support = URL(string: "https://rshamilton.github.io/treecostcalculator/support")!
-    static let privacy = URL(string: "https://rshamilton.github.io/treecostcalculator/privacy")!
-    static let terms = URL(string: "https://rshamilton.github.io/treecostcalculator/terms")!
+    static let website = URL(string: "https://rshamilton.github.io/tcc-app/")!
+    static let support = URL(string: "https://rshamilton.github.io/tcc-app/support")!
+    static let privacy = URL(string: "https://rshamilton.github.io/tcc-app/privacy")!
+    static let terms = URL(string: "https://rshamilton.github.io/tcc-app/terms")!
     static let supportEmail = "treecostcalculator@googlegroups.com"
 
     /// The app's open-source code (GPL-3.0).

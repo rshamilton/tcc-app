@@ -7,8 +7,8 @@
 <meta name="description" content="Free stump grinding cost calculator. Price each stump as diameter times your price per inch with a minimum charge, add several stumps, and see the total. Includes how to measure a stump.">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#1e8a4a">
-<link rel="canonical" href="https://rshamilton.github.io/treecostcalculator/stump-grinding-cost-calculator.html">
-<meta property="og:url" content="https://rshamilton.github.io/treecostcalculator/stump-grinding-cost-calculator.html">
+<link rel="canonical" href="https://rshamilton.github.io/tcc-app/stump-grinding-cost-calculator.html">
+<meta property="og:url" content="https://rshamilton.github.io/tcc-app/stump-grinding-cost-calculator.html">
 <meta property="og:title" content="Stump Grinding Cost Calculator: price by diameter in inches">
 <meta property="og:description" content="Free stump grinding cost calculator. Price each stump as diameter times your price per inch with a minimum charge, add several stumps, and see the total. Includes how to measure a stump.">
 <meta property="og:type" content="website">
@@ -128,7 +128,7 @@ table.t th{font-weight:600;color:var(--muted);font-size:13px;text-transform:none
 .crumbs{font-size:14px;color:var(--muted);margin-bottom:8px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 </style>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Stump grinding cost calculator", "url": "https://rshamilton.github.io/treecostcalculator/stump-grinding-cost-calculator.html", "description": "Free stump grinding cost calculator. Price each stump as diameter times your price per inch with a minimum charge, add several stumps, and see the total. Includes how to measure a stump.", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Any (web browser)", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isAccessibleForFree": true, "isPartOf": {"@type": "WebSite", "name": "Tree Cost Calculator", "url": "https://rshamilton.github.io/treecostcalculator/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Stump grinding cost calculator", "url": "https://rshamilton.github.io/tcc-app/stump-grinding-cost-calculator.html", "description": "Free stump grinding cost calculator. Price each stump as diameter times your price per inch with a minimum charge, add several stumps, and see the total. Includes how to measure a stump.", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Any (web browser)", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isAccessibleForFree": true, "isPartOf": {"@type": "WebSite", "name": "Tree Cost Calculator", "url": "https://rshamilton.github.io/tcc-app/"}}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I calculate stump grinding cost?", "acceptedAnswer": {"@type": "Answer", "text": "Multiply the stump's diameter in inches by your price per inch, and charge your minimum if that total is lower. For example, 24 in × $3 = $72, so a $100 minimum applies (example numbers)."}}, {"@type": "Question", "name": "How do I measure a stump for grinding?", "acceptedAnswer": {"@type": "Answer", "text": "Measure across the widest point of the stump in inches. If you only know the circumference, divide it by 3.14159 to get the diameter. Pick one convention for flared root bases and use it consistently."}}, {"@type": "Question", "name": "Does the minimum charge apply to each stump?", "acceptedAnswer": {"@type": "Answer", "text": "In this calculator, yes: each stump is charged the larger of its size-based price and the minimum. In the app, the minimum charge belongs to each line item."}}]}</script>
 </head>
 <body>
@@ -188,6 +188,7 @@ table.t th{font-weight:600;color:var(--muted);font-size:13px;text-transform:none
   <div id="stumps"></div>
   <p><button type="button" class="btn ghost" id="add">Add another stump</button></p>
   <div class="result" id="out" role="status" aria-live="polite"></div>
+  <p class="hint">Estimates only &mdash; see <a href="terms.html">Terms</a>.</p>
 </form>
 
 </div>
@@ -237,6 +238,7 @@ table.t th{font-weight:600;color:var(--muted);font-size:13px;text-transform:none
 </main>
 <footer class="site"><div class="wrap">
   <p>&copy; 2026 Ryan Hamilton &middot; Free and open-source software (GNU GPL v3)</p>
+  <p>Provided as is, without warranty. Results are estimates. See <a href="terms.html">Terms of Use</a>.</p>
   <nav aria-label="Footer"><a href="./">Home</a><a href="support.html">Support</a><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms of Use</a><a href="https://apps.apple.com/app/id6760602763">App Store</a><a href="https://github.com/rshamilton/tcc-app">GitHub</a><a href="mailto:treecostcalculator@googlegroups.com">treecostcalculator@googlegroups.com</a></nav>
   <nav aria-label="Calculators"><span class="fl">Free calculators:</span><a href="tree-removal-cost-calculator.html">Tree removal cost calculator</a><a href="stump-grinding-cost-calculator.html">Stump grinding cost calculator</a><a href="tree-height-calculator.html">Tree height calculator</a><a href="firewood-cord-calculator.html">Firewood cord calculator</a></nav>
 </div></footer>

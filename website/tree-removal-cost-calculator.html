@@ -7,8 +7,8 @@
 <meta name="description" content="Free tree removal cost calculator. Enter trunk circumference, height, your own rate and starting fee to get the tree&#x27;s volume and price. Includes the formula and a worked example.">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#1e8a4a">
-<link rel="canonical" href="https://rshamilton.github.io/treecostcalculator/tree-removal-cost-calculator.html">
-<meta property="og:url" content="https://rshamilton.github.io/treecostcalculator/tree-removal-cost-calculator.html">
+<link rel="canonical" href="https://rshamilton.github.io/tcc-app/tree-removal-cost-calculator.html">
+<meta property="og:url" content="https://rshamilton.github.io/tcc-app/tree-removal-cost-calculator.html">
 <meta property="og:title" content="Tree Removal Cost Calculator: price a tree by circumference and height">
 <meta property="og:description" content="Free tree removal cost calculator. Enter trunk circumference, height, your own rate and starting fee to get the tree&#x27;s volume and price. Includes the formula and a worked example.">
 <meta property="og:type" content="website">
@@ -128,7 +128,7 @@ table.t th{font-weight:600;color:var(--muted);font-size:13px;text-transform:none
 .crumbs{font-size:14px;color:var(--muted);margin-bottom:8px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 </style>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Tree removal cost calculator", "url": "https://rshamilton.github.io/treecostcalculator/tree-removal-cost-calculator.html", "description": "Free tree removal cost calculator. Enter trunk circumference, height, your own rate and starting fee to get the tree's volume and price. Includes the formula and a worked example.", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Any (web browser)", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isAccessibleForFree": true, "isPartOf": {"@type": "WebSite", "name": "Tree Cost Calculator", "url": "https://rshamilton.github.io/treecostcalculator/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Tree removal cost calculator", "url": "https://rshamilton.github.io/tcc-app/tree-removal-cost-calculator.html", "description": "Free tree removal cost calculator. Enter trunk circumference, height, your own rate and starting fee to get the tree's volume and price. Includes the formula and a worked example.", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Any (web browser)", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isAccessibleForFree": true, "isPartOf": {"@type": "WebSite", "name": "Tree Cost Calculator", "url": "https://rshamilton.github.io/tcc-app/"}}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I calculate the price to remove a tree?", "acceptedAnswer": {"@type": "Answer", "text": "Multiply the tree's volume by your rate and add a starting fee. Volume = circumference × circumference × height ÷ 12.56, so a 6 ft circumference, 50 ft tree is 143.3 cu ft; at $10 per cu ft plus a $150 starting fee that is $1,583.12 (example numbers)."}}, {"@type": "Question", "name": "Does this calculator tell me what tree removal costs in my area?", "acceptedAnswer": {"@type": "Answer", "text": "No. Rates vary by region, company and job, so you enter your own rate. The numbers on this page are examples."}}, {"@type": "Question", "name": "Can I use meters?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Choose Meters and enter circumference and height in meters. The volume is in cubic meters and the rate is per cubic meter."}}]}</script>
 </head>
 <body>
@@ -192,6 +192,7 @@ table.t th{font-weight:600;color:var(--muted);font-size:13px;text-transform:none
     <div><label for="tax">Tax % (optional)</label><input id="tax" inputmode="decimal" autocomplete="off" placeholder="0"></div>
   </div>
   <div class="result" id="out" role="status" aria-live="polite"></div>
+  <p class="hint">Estimates only &mdash; see <a href="terms.html">Terms</a>.</p>
 </form>
 
 </div>
@@ -252,6 +253,7 @@ table.t th{font-weight:600;color:var(--muted);font-size:13px;text-transform:none
 </main>
 <footer class="site"><div class="wrap">
   <p>&copy; 2026 Ryan Hamilton &middot; Free and open-source software (GNU GPL v3)</p>
+  <p>Provided as is, without warranty. Results are estimates. See <a href="terms.html">Terms of Use</a>.</p>
   <nav aria-label="Footer"><a href="./">Home</a><a href="support.html">Support</a><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms of Use</a><a href="https://apps.apple.com/app/id6760602763">App Store</a><a href="https://github.com/rshamilton/tcc-app">GitHub</a><a href="mailto:treecostcalculator@googlegroups.com">treecostcalculator@googlegroups.com</a></nav>
   <nav aria-label="Calculators"><span class="fl">Free calculators:</span><a href="tree-removal-cost-calculator.html">Tree removal cost calculator</a><a href="stump-grinding-cost-calculator.html">Stump grinding cost calculator</a><a href="tree-height-calculator.html">Tree height calculator</a><a href="firewood-cord-calculator.html">Firewood cord calculator</a></nav>
 </div></footer>

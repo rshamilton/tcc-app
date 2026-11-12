@@ -49,12 +49,18 @@ final class TreeCostCalculatorUITests: XCTestCase {
 
     func testOnboardingLeadsToEmptyList() {
         launch(onboarded: false, ["-resetData"])
+        // The first launch checks iCloud for a backup before showing onboarding.
+        XCTAssertTrue(app.buttons["Continue"].waitForExistence(timeout: 15))
         for _ in 0..<3 {
             app.buttons["Continue"].tap()
         }
         snap("onboarding-setup")
-        app.buttons["Start Estimating"].tap()
-        XCTAssertTrue(app.staticTexts["Quote your first tree"].waitForExistence(timeout: 3))
+        let start = app.buttons["Start Estimating"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        // The setup page scrolls; the button can sit below the terms note on small screens.
+        for _ in 0..<4 where !start.isHittable { app.swipeUp() }
+        start.tap()
+        XCTAssertTrue(app.staticTexts["Quote your first tree"].waitForExistence(timeout: 5))
         snap("empty-state")
     }
 
@@ -327,7 +333,10 @@ final class TreeCostCalculatorUITests: XCTestCase {
         // Services & Prices opens too (a mistyped navigation path used to swallow these taps).
         let services = app.staticTexts.matching(labelContains("Services & Prices")).firstMatch
         for _ in 0..<12 where !(services.exists && services.isHittable) { app.swipeDown() }
-        services.tap()
+        // The list can still be settling after the swipes, which swallows the first tap; tap again if needed.
+        for _ in 0..<2 where !app.navigationBars["Services & Prices"].waitForExistence(timeout: 3) {
+            if services.isHittable { services.tap() }
+        }
         XCTAssertTrue(app.navigationBars["Services & Prices"].waitForExistence(timeout: 5))
     }
 

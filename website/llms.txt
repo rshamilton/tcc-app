@@ -13,15 +13,15 @@ Key facts:
 ## App
 - [Download on the App Store](https://apps.apple.com/app/id6760602763): iPhone and iPad, iOS 17 or later
 - [Source code on GitHub](https://github.com/rshamilton/tcc-app): GNU GPL v3; report bugs and suggest features at https://github.com/rshamilton/tcc-app/issues
-- [Home page and FAQ](https://rshamilton.github.io/treecostcalculator/): features, how the price is worked out, who it is for
+- [Home page and FAQ](https://rshamilton.github.io/tcc-app/): features, how the price is worked out, who it is for
 
 ## Free calculators (run in the browser, no sign-up)
-- [Tree removal cost calculator](https://rshamilton.github.io/treecostcalculator/tree-removal-cost-calculator.html): price a tree from circumference, height, your rate and starting fee
-- [Stump grinding cost calculator](https://rshamilton.github.io/treecostcalculator/stump-grinding-cost-calculator.html): diameter x price per inch with a minimum charge, multiple stumps
-- [Tree height calculator](https://rshamilton.github.io/treecostcalculator/tree-height-calculator.html): tangent method with a phone clinometer, plus trunk diameter (DBH) from circumference
-- [Firewood cord calculator](https://rshamilton.github.io/treecostcalculator/firewood-cord-calculator.html): cords, face cords and cubic meters from stack dimensions (a cord is 128 cubic feet)
+- [Tree removal cost calculator](https://rshamilton.github.io/tcc-app/tree-removal-cost-calculator.html): price a tree from circumference, height, your rate and starting fee
+- [Stump grinding cost calculator](https://rshamilton.github.io/tcc-app/stump-grinding-cost-calculator.html): diameter x price per inch with a minimum charge, multiple stumps
+- [Tree height calculator](https://rshamilton.github.io/tcc-app/tree-height-calculator.html): tangent method with a phone clinometer, plus trunk diameter (DBH) from circumference
+- [Firewood cord calculator](https://rshamilton.github.io/tcc-app/firewood-cord-calculator.html): cords, face cords and cubic meters from stack dimensions (a cord is 128 cubic feet)
 
 ## Help and policies
-- [Support](https://rshamilton.github.io/treecostcalculator/support.html): getting started, FAQ, troubleshooting, contact treecostcalculator@googlegroups.com
-- [Privacy Policy](https://rshamilton.github.io/treecostcalculator/privacy.html): Data Not Collected
-- [Terms of Use](https://rshamilton.github.io/treecostcalculator/terms.html): GPL v3 source license, Apple EULA for the App Store copy, estimates-only disclaimers
+- [Support](https://rshamilton.github.io/tcc-app/support.html): getting started, FAQ, troubleshooting, contact treecostcalculator@googlegroups.com
+- [Privacy Policy](https://rshamilton.github.io/tcc-app/privacy.html): Data Not Collected
+- [Terms of Use](https://rshamilton.github.io/tcc-app/terms.html): GPL v3 source license, Apple EULA for the App Store copy, estimates-only disclaimers

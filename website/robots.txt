@@ -43,4 +43,4 @@ Allow: /
 User-agent: Applebot-Extended
 Allow: /
 
-Sitemap: https://rshamilton.github.io/treecostcalculator/sitemap.xml
+Sitemap: https://rshamilton.github.io/tcc-app/sitemap.xml

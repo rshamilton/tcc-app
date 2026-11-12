@@ -35,6 +35,10 @@ struct SignatureCaptureSheet: View {
 
                     pad
 
+                    Text("You are responsible for whether an on-screen signature is valid for your agreements where you work.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
                     HStack {
                         Spacer()
                         Button("Clear") { strokes = [] }

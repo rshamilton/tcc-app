@@ -43,6 +43,11 @@ struct AboutView: View {
                 Link(destination: AppLinks.terms) {
                     Label("Terms of Use", systemImage: "doc.text")
                 }
+                NavigationLink {
+                    DisclaimerView()
+                } label: {
+                    Label("Disclaimer & Terms", systemImage: "exclamationmark.shield")
+                }
                 Link(destination: AppLinks.website) {
                     Label("Website", systemImage: "globe")
                 }
@@ -50,6 +55,7 @@ struct AboutView: View {
 
             Section {
                 Text("This program comes with ABSOLUTELY NO WARRANTY. It is free software, and you are welcome to redistribute it under the terms of the GNU General Public License version 3 or later.")
+                Text("Provided \"as is\", without warranty. Everything this app calculates is an estimate that you must check. It is not professional, legal, tax or safety advice. You are solely responsible for your prices, documents, taxes, work and data, and the Developer is not liable for any loss or damage. See the Disclaimer & Terms and the Terms of Use.")
                 Text("© 2026 Ryan Hamilton")
             }
             .font(.footnote)
