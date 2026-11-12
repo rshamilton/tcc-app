@@ -58,7 +58,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
         let start = app.buttons["Start Estimating"]
         XCTAssertTrue(start.waitForExistence(timeout: 5))
         // The setup page scrolls; the button can sit below the terms note on small screens.
-        for _ in 0..<4 where !start.isHittable { app.swipeUp() }
+        for _ in 0..<4 where !start.isHittable { scrollUp() }
         start.tap()
         XCTAssertTrue(app.staticTexts["Quote your first tree"].waitForExistence(timeout: 5))
         snap("empty-state")
@@ -81,8 +81,13 @@ final class TreeCostCalculatorUITests: XCTestCase {
         // 6² × 50 ÷ 12.56 = 143.31 cu ft → $1,433.12 at $10/cu ft
         XCTAssertTrue(app.staticTexts["$1,433.12"].firstMatch.waitForExistence(timeout: 3))
 
-        app.buttons["Add Another Tree"].tap()
-        XCTAssertTrue(next.waitForExistence(timeout: 3))
+        let addTree = app.buttons["addTreeMenu"]
+        XCTAssertTrue(addTree.waitForExistence(timeout: 5))
+        let addTreeEntry = menuEntry(NSPredicate(format: "label == 'Add Tree'"))
+        tapMenu(addTree, until: { next.exists || addTreeEntry.exists })
+        // On some iOS versions the tap opens the menu instead of adding a tree; choose the entry then.
+        if !next.exists && addTreeEntry.exists { addTreeEntry.tap() }
+        XCTAssertTrue(next.waitForExistence(timeout: 5), "A second tree should open with its first field focused")
         app.typeText("4")
         next.tap()
         app.typeText("20")
@@ -126,7 +131,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
         XCTAssertTrue(editorTitle("EST-0005").waitForExistence(timeout: 5))
         let regionMenu = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Texas'")).firstMatch
         // Scroll until the menu is on screen and clear of the bottom bar.
-        for _ in 0..<6 where !regionMenu.exists { app.swipeUp() }
+        for _ in 0..<6 where !regionMenu.exists { scrollUp() }
         // The bottom bar can cover the row; nudge it up with a short drag.
         let frame = regionMenu.frame
         if frame.maxY > app.frame.height - 160 {
@@ -138,7 +143,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
         regionMenu.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         snap("tax-region-menu")
         app.buttons["Oklahoma (4.5%)"].tap()
-        for _ in 0..<3 where !app.staticTexts["Tax – Oklahoma (4.5%)"].exists { app.swipeUp() }
+        for _ in 0..<3 where !app.staticTexts["Tax – Oklahoma (4.5%)"].exists { scrollUp() }
         XCTAssertTrue(app.staticTexts["Tax – Oklahoma (4.5%)"].exists)
         snap("tax-region-oklahoma")
     }
@@ -146,17 +151,60 @@ final class TreeCostCalculatorUITests: XCTestCase {
 
     // MARK: - v1.1 features
 
+    /// The list that holds the content being edited: the largest list that is actually on top. On iPad the
+    /// sidebar, the detail column and a Settings sheet are all lists, and swiping the whole app can start
+    /// outside the one that should scroll.
+    private var scroller: XCUIElement {
+        let lists = app.collectionViews.allElementsBoundByIndex + app.tables.allElementsBoundByIndex
+        let onTop = lists.filter { $0.exists && $0.isHittable }
+        let best = onTop.max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+        return best ?? app
+    }
+
+    private func scrollUp() { scroller.swipeUp() }
+    private func scrollDown() { scroller.swipeDown() }
+
+    /// Taps a menu button and waits for something that proves it did its job, retrying with other kinds of
+    /// press. A menu's tap can be swallowed while a list is still settling, or open the menu instead of
+    /// running its primary action, depending on the iOS version.
+    private func tapMenu(_ menu: XCUIElement, until proof: () -> Bool, timeout: TimeInterval = 3) {
+        let steps: [() -> Void] = [
+            { menu.tap() },
+            { menu.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).tap() },
+            { menu.press(forDuration: 0.8) }
+        ]
+        for step in steps {
+            step()
+            let deadline = Date().addingTimeInterval(timeout)
+            while Date() < deadline {
+                if proof() { return }
+                usleep(200_000)
+            }
+        }
+    }
+
+    /// Any menu entry (button or menu item) whose label matches the predicate.
+    private func menuEntry(_ predicate: NSPredicate) -> XCUIElement {
+        app.descendants(matching: .any).matching(predicate).matching(NSPredicate(format: "elementType == %d OR elementType == %d", XCUIElement.ElementType.button.rawValue, XCUIElement.ElementType.menuItem.rawValue)).firstMatch
+    }
+
     /// Scrolls up until the element can be tapped (not off-screen or under the bottom bar).
-    private func reveal(_ element: XCUIElement, attempts: Int = 10, file: StaticString = #filePath, line: UInt = #line) {
+    private func reveal(_ element: XCUIElement, attempts: Int = 12, file: StaticString = #filePath, line: UInt = #line) {
         // Also clear the bottom total / Preview & Share bar, which floats over the last rows.
         // Once the row is on screen, nudge gently instead of swiping a full screen past it.
-        let clearBottom = app.frame.height - 130
-        for _ in 0..<attempts where !(element.exists && element.isHittable && element.frame.maxY < clearBottom) {
-            if element.exists && element.frame.minY > 150 && element.frame.minY < app.frame.height {
-                app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
-                    .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)))
+        var nudgeFailed = false
+        for _ in 0..<attempts {
+            let list = scroller
+            let clearBottom = list.frame.maxY - 130
+            if element.exists && element.isHittable && element.frame.maxY < clearBottom { break }
+            if !nudgeFailed && element.exists && element.frame.minY > list.frame.minY + 100 && element.frame.minY < list.frame.maxY {
+                let before = element.frame.minY
+                list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+                    .press(forDuration: 0.05, thenDragTo: list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)))
+                // If a gentle drag doesn't move anything, fall back to full swipes.
+                if abs(element.frame.minY - before) < 1 { nudgeFailed = true }
             } else {
-                app.swipeUp()
+                list.swipeUp()
             }
         }
         XCTAssertTrue(element.exists && element.isHittable, "Couldn't scroll to \(element)", file: file, line: line)
@@ -191,9 +239,9 @@ final class TreeCostCalculatorUITests: XCTestCase {
 
         let addWork = app.buttons["Add Other Work"]
         reveal(addWork)
-        addWork.tap()
-        let stump = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Stump grinding'")).firstMatch
-        XCTAssertTrue(stump.waitForExistence(timeout: 5))
+        let stump = menuEntry(NSPredicate(format: "label BEGINSWITH 'Stump grinding'"))
+        tapMenu(addWork, until: { stump.exists })
+        XCTAssertTrue(stump.waitForExistence(timeout: 5), "Add Other Work menu should list Stump grinding")
         stump.tap()
 
         enter("20", in: app.textFields["Quantity for Stump grinding"])
@@ -234,7 +282,9 @@ final class TreeCostCalculatorUITests: XCTestCase {
         name.typeText("Backyard oak removal")
         tapKeyboardDone()
 
-        XCTAssertTrue(app.navigationBars["Backyard oak removal"].waitForExistence(timeout: 5), "Nav title should show the name")
+        // The bar's own identifier can keep the first title, so look for the title text inside the bar.
+        let title = app.navigationBars.staticTexts["Backyard oak removal"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5) || app.navigationBars["Backyard oak removal"].exists, "Nav title should show the name")
         snap("named-estimate")
 
         if !isPad { app.navigationBars.buttons.firstMatch.tap() }
@@ -253,7 +303,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
         XCTAssertFalse(sign.isEnabled, "Signature should be off on an empty estimate")
         snap("signature-disabled")
 
-        for _ in 0..<6 { app.swipeDown() }
+        for _ in 0..<6 { scrollDown() }
         enter("6", in: app.textFields["circumferenceField"])
         enter("50", in: app.textFields["heightField"])
         tapKeyboardDone()
@@ -299,8 +349,8 @@ final class TreeCostCalculatorUITests: XCTestCase {
 
         let addWork = app.buttons["Add Other Work"]
         reveal(addWork)
-        addWork.tap()
-        let stump = app.buttons.matching(labelContains("about 23 in")).firstMatch
+        let stump = menuEntry(labelContains("about 23 in"))
+        tapMenu(addWork, until: { stump.exists })
         XCTAssertTrue(stump.waitForExistence(timeout: 5), "No stump grinding entry for the measured tree")
         stump.tap()
 
@@ -319,7 +369,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
         func item(_ text: String) -> XCUIElement { app.descendants(matching: .any).matching(labelContains(text)).firstMatch }
 
         for text in ["Services & Prices", "Export All Estimates (CSV)", "Suggest a Feature or Report a Bug", "Rate Tree Cost Calculator"] {
-            for _ in 0..<10 where !item(text).exists { app.swipeUp() }
+            for _ in 0..<10 where !item(text).exists { scrollUp() }
             XCTAssertTrue(item(text).exists, "Missing \(text)")
         }
 
@@ -332,7 +382,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
 
         // Services & Prices opens too (a mistyped navigation path used to swallow these taps).
         let services = app.staticTexts.matching(labelContains("Services & Prices")).firstMatch
-        for _ in 0..<12 where !(services.exists && services.isHittable) { app.swipeDown() }
+        for _ in 0..<12 where !(services.exists && services.isHittable) { scrollDown() }
         // The list can still be settling after the swipes, which swallows the first tap; tap again if needed.
         for _ in 0..<2 where !app.navigationBars["Services & Prices"].waitForExistence(timeout: 3) {
             if services.isHittable { services.tap() }
@@ -356,7 +406,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
         app.buttons["Save"].tap()
 
         let caption = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Signed by'")).firstMatch
-        for _ in 0..<4 where !caption.exists { app.swipeUp() }
+        for _ in 0..<4 where !caption.exists { scrollUp() }
         XCTAssertTrue(caption.waitForExistence(timeout: 5), "No signed-by caption")
         XCTAssertTrue(caption.label.contains("Lena Ortiz"))
     }
@@ -549,18 +599,18 @@ final class TreeCostCalculatorUITests: XCTestCase {
         store("02-estimate-top")
 
         let otherWork = app.staticTexts["OTHER WORK"].firstMatch.exists ? app.staticTexts["OTHER WORK"].firstMatch : app.staticTexts["Other Work"].firstMatch
-        for _ in 0..<8 where !otherWork.exists { app.swipeUp() }
+        for _ in 0..<8 where !otherWork.exists { scrollUp() }
         bringToTop(otherWork)
         store("03-other-work")
 
         let signedBy = text("Signed by")
         // Start the shot at the Summary heading so every price line (tree removal, other work, …) is visible.
         let summary = app.staticTexts["SUMMARY"].firstMatch.exists ? app.staticTexts["SUMMARY"].firstMatch : app.staticTexts["Summary"].firstMatch
-        for _ in 0..<10 where !summary.exists { app.swipeUp() }
+        for _ in 0..<10 where !summary.exists { scrollUp() }
         bringToTop(summary)
         store("04-summary")
 
-        for _ in 0..<8 where !signedBy.exists { app.swipeUp() }
+        for _ in 0..<8 where !signedBy.exists { scrollUp() }
         reveal(signedBy)
         for _ in 0..<2 {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
@@ -590,7 +640,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 4))
         let services = text("Services & Prices")
-        for _ in 0..<10 where !services.exists { app.swipeUp() }
+        for _ in 0..<10 where !services.exists { scrollUp() }
         reveal(services)
         // The form can still be settling after scrolling, which swallows a tap; tap again until it opens.
         for _ in 0..<3 where !app.navigationBars["Services & Prices"].exists {
@@ -601,7 +651,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
         store("08-services")
         app.navigationBars["Services & Prices"].buttons.firstMatch.tap()
 
-        for _ in 0..<3 { app.swipeDown() }
+        for _ in 0..<3 { scrollDown() }
         store("09-settings")
     }
 
