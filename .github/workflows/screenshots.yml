@@ -34,8 +34,12 @@ jobs:
             -only-testing:"Tree Cost CalculatorUITests/TreeCostCalculatorUITests/testAppStoreScreenshots" \
             CODE_SIGNING_ALLOWED=NO | tail -100
           ls -la "$RUNNER_TEMP/store"
+      - name: Sizes
+        if: always()
+        run: |
           sips -g pixelWidth -g pixelHeight "$RUNNER_TEMP"/store/*.png | grep pixel | sort | uniq -c
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: screenshots-${{ matrix.device }}
           path: ${{ runner.temp }}/store/*.png

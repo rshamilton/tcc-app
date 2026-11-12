@@ -592,7 +592,11 @@ final class TreeCostCalculatorUITests: XCTestCase {
         let services = text("Services & Prices")
         for _ in 0..<10 where !services.exists { app.swipeUp() }
         reveal(services)
-        services.tap()
+        // The form can still be settling after scrolling, which swallows a tap; tap again until it opens.
+        for _ in 0..<3 where !app.navigationBars["Services & Prices"].exists {
+            if services.isHittable { services.tap() }
+            _ = app.navigationBars["Services & Prices"].waitForExistence(timeout: 3)
+        }
         XCTAssertTrue(app.navigationBars["Services & Prices"].waitForExistence(timeout: 5))
         store("08-services")
         app.navigationBars["Services & Prices"].buttons.firstMatch.tap()
