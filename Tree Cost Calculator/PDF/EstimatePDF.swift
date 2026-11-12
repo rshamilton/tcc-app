@@ -162,6 +162,12 @@ final class EstimatePDF {
     }
 
     private func drawParties() {
+        // The job name leads, so the customer sees what the document is about before who it is for.
+        let job = estimate.title.trimmed
+        if !job.isEmpty {
+            y += drawText("JOB", x: margin, y: y, width: contentWidth, font: .systemFont(ofSize: 8, weight: .bold), color: muted, kern: 1) + 5
+            y += drawText(job, x: margin, y: y, width: contentWidth, font: .boldSystemFont(ofSize: 14), color: ink) + 16
+        }
         let hasCustomer = ![estimate.customerName, estimate.customerPhone, estimate.customerEmail].allSatisfy { $0.trimmed.isEmpty }
         let hasAddress = !estimate.address.trimmed.isEmpty
         guard hasCustomer || hasAddress else { return }

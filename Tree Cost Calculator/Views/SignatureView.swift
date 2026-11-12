@@ -39,7 +39,7 @@ struct SignatureCaptureSheet: View {
                         Spacer()
                         Button("Clear") { strokes = [] }
                             .disabled(strokes.isEmpty)
-                            .accessibilityHint("Erases the signature so you can start over")
+                            .accessibilityHint(strokes.isEmpty ? "Nothing to clear yet" : "Erases the signature so you can start over")
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
@@ -69,6 +69,7 @@ struct SignatureCaptureSheet: View {
                     Button("Save") { save() }
                         .fontWeight(.semibold)
                         .disabled(strokes.isEmpty)
+                        .accessibilityHint(strokes.isEmpty ? "Sign in the box first" : "Saves the signature")
                 }
             }
         }

@@ -318,6 +318,9 @@ nonisolated struct Estimate: Identifiable, Codable, Equatable {
     var createdAt = Date()
     var updatedAt = Date()
 
+    /// The name the user gives this job, e.g. "Backyard oak removal". Optional: lists fall back to the customer.
+    var title = ""
+
     // Customer & job site
     var customerName = ""
     var customerPhone = ""
@@ -379,15 +382,20 @@ nonisolated struct Estimate: Identifiable, Codable, Equatable {
     /// (Stump-only or trimming-only jobs have no measured tree.)
     var hasBillableWork: Bool { hasMeasuredTree || lineItems.contains { $0.amount > 0 } }
 
-    /// Name used in lists and file names.
+    /// Name used in lists and titles: the estimate's own name, else the customer's name.
     var displayName: String {
-        let name = customerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !title.trimmed.isEmpty { return title.trimmed }
+        let name = customerName.trimmed
         return name.isEmpty ? "Untitled Estimate" : name
     }
 
+    /// True when the user hasn't named the estimate or the customer, so `displayName` is a placeholder.
+    var isUnnamed: Bool { title.trimmed.isEmpty && customerName.trimmed.isEmpty }
+
     /// True when the user hasn't entered anything worth keeping.
     var isBlank: Bool {
-        customerName.trimmed.isEmpty
+        title.trimmed.isEmpty
+            && customerName.trimmed.isEmpty
             && customerPhone.trimmed.isEmpty
             && customerEmail.trimmed.isEmpty
             && address.trimmed.isEmpty
@@ -432,7 +440,7 @@ nonisolated struct Estimate: Identifiable, Codable, Equatable {
     // MARK: Codable (lenient, so future versions can add fields safely)
 
     private enum CodingKeys: String, CodingKey {
-        case id, number, status, createdAt, updatedAt
+        case id, number, status, createdAt, updatedAt, title
         case customerName, customerPhone, customerEmail, address
         case trees, sitePhotoIDs, notes
         case unitSystem, startingFee, ratePerUnit, taxRate
@@ -448,6 +456,7 @@ nonisolated struct Estimate: Identifiable, Codable, Equatable {
         status = c.lenient(EstimateStatus.self, .status) ?? .draft
         createdAt = (try? c.decodeIfPresent(Date.self, forKey: .createdAt)) ?? Date()
         updatedAt = (try? c.decodeIfPresent(Date.self, forKey: .updatedAt)) ?? createdAt
+        title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? ""
         customerName = (try? c.decodeIfPresent(String.self, forKey: .customerName)) ?? ""
         customerPhone = (try? c.decodeIfPresent(String.self, forKey: .customerPhone)) ?? ""
         customerEmail = (try? c.decodeIfPresent(String.self, forKey: .customerEmail)) ?? ""

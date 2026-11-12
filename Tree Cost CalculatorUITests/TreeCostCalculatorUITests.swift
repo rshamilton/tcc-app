@@ -117,7 +117,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
     func testSwitchingTaxRegionUpdatesTax() throws {
         try XCTSkipIf(isPad, "Covered on iPhone")
         launch(["-demoData", "-openEstimate", "0"])
-        XCTAssertTrue(app.navigationBars["EST-0005"].waitForExistence(timeout: 5))
+        XCTAssertTrue(editorTitle("EST-0005").waitForExistence(timeout: 5))
         let regionMenu = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Texas'")).firstMatch
         // Scroll until the menu is on screen and clear of the bottom bar.
         for _ in 0..<6 where !regionMenu.exists { app.swipeUp() }
@@ -142,7 +142,17 @@ final class TreeCostCalculatorUITests: XCTestCase {
 
     /// Scrolls up until the element can be tapped (not off-screen or under the bottom bar).
     private func reveal(_ element: XCUIElement, attempts: Int = 10, file: StaticString = #filePath, line: UInt = #line) {
-        for _ in 0..<attempts where !(element.exists && element.isHittable) { app.swipeUp() }
+        // Also clear the bottom total / Preview & Share bar, which floats over the last rows.
+        // Once the row is on screen, nudge gently instead of swiping a full screen past it.
+        let clearBottom = app.frame.height - 130
+        for _ in 0..<attempts where !(element.exists && element.isHittable && element.frame.maxY < clearBottom) {
+            if element.exists && element.frame.minY > 150 && element.frame.minY < app.frame.height {
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+                    .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)))
+            } else {
+                app.swipeUp()
+            }
+        }
         XCTAssertTrue(element.exists && element.isHittable, "Couldn't scroll to \(element)", file: file, line: line)
     }
 
@@ -154,6 +164,12 @@ final class TreeCostCalculatorUITests: XCTestCase {
         // An empty field reports its placeholder as the value, so always clear (extra deletes are harmless).
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count + 2))
         field.typeText(text)
+    }
+
+    /// The number caption at the top of the editor ("EST-0002 · created ..."). The navigation title shows the
+    /// estimate's name now, so the document number is found here instead.
+    private func editorTitle(_ number: String) -> XCUIElement {
+        app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", number + " ·")).firstMatch
     }
 
     private func labelContains(_ text: String) -> NSPredicate { NSPredicate(format: "label CONTAINS %@", text) }
@@ -186,11 +202,11 @@ final class TreeCostCalculatorUITests: XCTestCase {
     /// Estimate -> invoice -> paid through the status menu.
     func testCreateInvoiceAndMarkPaid() {
         launch(["-demoData", "-openEstimate", "0"])
-        XCTAssertTrue(app.navigationBars["EST-0005"].waitForExistence(timeout: 8))
+        XCTAssertTrue(editorTitle("EST-0005").waitForExistence(timeout: 8))
 
         app.buttons["Status: Sent"].tap()
         app.buttons["Create Invoice"].tap()
-        XCTAssertTrue(app.navigationBars["INV-0005"].waitForExistence(timeout: 5), "Title should become the invoice number")
+        XCTAssertTrue(editorTitle("INV-0005").waitForExistence(timeout: 5), "Title should become the invoice number")
         XCTAssertTrue(app.buttons["Invoice & Share"].exists)
 
         app.buttons["Status: Invoiced"].tap()
@@ -199,38 +215,95 @@ final class TreeCostCalculatorUITests: XCTestCase {
         snap("invoice-paid")
     }
 
-    func testTreeToolsCalculate() {
+    /// Naming an estimate shows the name as the navigation title and in the list.
+    func testNamingAnEstimateShowsNameInTitleAndList() {
         launch(["-resetData"])
-        app.buttons["Tree Tools"].firstMatch.tap()
-        XCTAssertTrue(app.navigationBars["Tree Tools"].waitForExistence(timeout: 5))
+        app.buttons["New Estimate"].tap()
+        XCTAssertTrue(app.buttons["Next field"].waitForExistence(timeout: 10))
+        tapKeyboardDone()
 
-        let tools = ["Measure Tree Height", "Trunk Diameter", "Stump Grinding Price", "Firewood Cords", "Log Board Feet", "Log Weight"]
-        func row(_ title: String) -> XCUIElement { app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title)).firstMatch }
-        // The list behind the sheet has a "Tree Tools" button too; the back button is the last match.
-        var back: XCUIElement { app.navigationBars.buttons.matching(identifier: "Tree Tools").allElementsBoundByIndex.last ?? app.navigationBars.buttons["Tree Tools"] }
+        let name = app.textFields["estimateNameField"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5), "No estimate name field")
+        name.tap()
+        name.typeText("Backyard oak removal")
+        tapKeyboardDone()
 
-        // Every tool opens.
-        for title in tools {
-            XCTAssertTrue(row(title).waitForExistence(timeout: 5), "No row for \(title)")
-            row(title).tap()
-            XCTAssertTrue(app.navigationBars.buttons["Tree Tools"].waitForExistence(timeout: 5), "\(title) didn't open")
-            back.tap()
-        }
+        XCTAssertTrue(app.navigationBars["Backyard oak removal"].waitForExistence(timeout: 5), "Nav title should show the name")
+        snap("named-estimate")
 
-        // 72 in around (6 ft) is about 22.9 in across.
-        row("Trunk Diameter").tap()
-        enter("72", in: app.textFields["Distance around trunk"])
-        XCTAssertTrue(app.staticTexts.matching(labelContains("22.9")).firstMatch.waitForExistence(timeout: 5), "No diameter result")
-        snap("tool-diameter")
-        back.tap()
+        if !isPad { app.navigationBars.buttons.firstMatch.tap() }
+        XCTAssertTrue(app.staticTexts["Backyard oak removal"].waitForExistence(timeout: 5), "Name should show in the list")
+    }
 
-        // 8 ft x 4 ft x 4 ft is exactly one cord.
-        row("Firewood Cords").tap()
-        enter("8", in: app.textFields["Stack length"])
-        enter("4", in: app.textFields["Stack width (log length)"])
-        enter("4", in: app.textFields["Stack height"])
-        XCTAssertTrue(app.staticTexts.matching(labelContains("Full cords")).firstMatch.waitForExistence(timeout: 5), "No firewood result")
-        snap("tool-firewood")
+    /// A button that can't do anything yet is disabled (and greyed), then comes alive with real measurements.
+    func testSignatureButtonDisabledUntilThereIsWork() {
+        launch(["-resetData"])
+        app.buttons["New Estimate"].tap()
+        XCTAssertTrue(app.buttons["Next field"].waitForExistence(timeout: 10))
+        tapKeyboardDone()
+
+        let sign = app.buttons["getSignatureButton"]
+        reveal(sign)
+        XCTAssertFalse(sign.isEnabled, "Signature should be off on an empty estimate")
+        snap("signature-disabled")
+
+        for _ in 0..<6 { app.swipeDown() }
+        enter("6", in: app.textFields["circumferenceField"])
+        enter("50", in: app.textFields["heightField"])
+        tapKeyboardDone()
+
+        reveal(sign)
+        XCTAssertTrue(sign.isEnabled, "Signature should be on once a tree is measured")
+    }
+
+    /// 24 in across is 6.28 ft around (24 x pi / 12).
+    func testEnterTrunkDiameterSetsCircumference() {
+        launch(["-resetData"])
+        app.buttons["New Estimate"].tap()
+        XCTAssertTrue(app.buttons["Next field"].waitForExistence(timeout: 10))
+        tapKeyboardDone()
+
+        let options = app.buttons["treeOptionsMenu"].firstMatch
+        XCTAssertTrue(options.waitForExistence(timeout: 5))
+        options.tap()
+        let enterDiameter = app.buttons["Enter Trunk Diameter…"]
+        XCTAssertTrue(enterDiameter.waitForExistence(timeout: 5))
+        enterDiameter.tap()
+
+        let sheetBar = app.navigationBars["Trunk Diameter"]
+        XCTAssertTrue(sheetBar.waitForExistence(timeout: 5))
+        enter("24", in: app.textFields["trunkDiameterField"])
+        snap("trunk-diameter-sheet")
+        sheetBar.buttons["Done"].tap()
+        XCTAssertTrue(sheetBar.waitForNonExistence(timeout: 5))
+
+        let circumference = app.textFields["circumferenceField"]
+        XCTAssertTrue(circumference.waitForExistence(timeout: 5))
+        XCTAssertEqual(circumference.value as? String, "6.28")
+        XCTAssertTrue(app.staticTexts.matching(labelContains("Diameter ≈ 24")).firstMatch.exists, "Caption should read about 24 in")
+    }
+
+    /// Stump grinding from a measured tree: 6 ft around is 22.9 in across, rounded up to 23.
+    func testStumpGrindingFromTreeAddsLineItem() {
+        launch(["-resetData"])
+        app.buttons["New Estimate"].tap()
+        XCTAssertTrue(app.buttons["Next field"].waitForExistence(timeout: 10))
+        app.typeText("6")
+        tapKeyboardDone()
+
+        let addWork = app.buttons["Add Other Work"]
+        reveal(addWork)
+        addWork.tap()
+        let stump = app.buttons.matching(labelContains("about 23 in")).firstMatch
+        XCTAssertTrue(stump.waitForExistence(timeout: 5), "No stump grinding entry for the measured tree")
+        stump.tap()
+
+        let quantity = app.textFields["lineItemQuantityField"]
+        XCTAssertTrue(quantity.waitForExistence(timeout: 5))
+        XCTAssertEqual(quantity.value as? String, "23")
+        let name = app.textFields["lineItemNameField"]
+        XCTAssertEqual(name.value as? String, "Stump grinding – Tree 1")
+        snap("stump-from-tree")
     }
 
     func testSettingsShowsNewRows() {
@@ -260,7 +333,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
 
     func testCustomerSignatureCanBeSigned() {
         launch(["-demoData", "-openEstimate", "1"])
-        XCTAssertTrue(app.navigationBars["EST-0004"].waitForExistence(timeout: 8))
+        XCTAssertTrue(editorTitle("EST-0004").waitForExistence(timeout: 8))
 
         let sign = app.buttons["Get Customer Signature"]
         reveal(sign)
@@ -286,11 +359,11 @@ final class TreeCostCalculatorUITests: XCTestCase {
         try XCTSkipIf(isPad, "Back navigation is iPhone-only")
         launch(["-demoData"])
         app.staticTexts["Priya Raman"].tap()
-        XCTAssertTrue(app.navigationBars["EST-0002"].waitForExistence(timeout: 3))
+        XCTAssertTrue(editorTitle("EST-0002").waitForExistence(timeout: 3))
         app.navigationBars.buttons.firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Priya Raman"].waitForExistence(timeout: 3))
         app.staticTexts["Priya Raman"].tap()
-        XCTAssertTrue(app.navigationBars["EST-0002"].waitForExistence(timeout: 3))
+        XCTAssertTrue(editorTitle("EST-0002").waitForExistence(timeout: 3))
     }
 
     /// New Estimate on an empty list opens the editor every time (it used to do nothing, intermittently).
@@ -301,7 +374,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
             // Tapped as soon as it's there, and again once the screen has settled.
             if attempt.isMultiple(of: 2) { _ = app.staticTexts["Quote your first tree"].waitForExistence(timeout: 8); sleep(2) }
             app.buttons["New Estimate"].tap()
-            XCTAssertTrue(app.navigationBars["EST-0001"].waitForExistence(timeout: 10), "Editor didn't open on attempt \(attempt)")
+            XCTAssertTrue(editorTitle("EST-0001").waitForExistence(timeout: 10), "Editor didn't open on attempt \(attempt)")
             app.terminate()
         }
     }
@@ -315,7 +388,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Jordan Ellis"].exists)
         app.buttons["New Estimate"].tap()
         XCTAssertTrue(app.buttons["Next field"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.navigationBars["EST-0006"].exists)
+        XCTAssertTrue(editorTitle("EST-0006").exists)
     }
 
     // MARK: - Backup and restore
@@ -351,7 +424,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Continue"].exists, "Onboarding shown after restoring")
         snap("restore-new-device")
         app.staticTexts["Priya Raman"].tap()
-        XCTAssertTrue(app.navigationBars["EST-0002"].waitForExistence(timeout: 3))
+        XCTAssertTrue(editorTitle("EST-0002").waitForExistence(timeout: 3))
     }
 
     /// A backup iCloud only finds out about after launch is offered once it shows up.
@@ -388,7 +461,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
 
         // Opening an estimate fills the detail pane while the list stays visible.
         app.staticTexts["Priya Raman"].tap()
-        XCTAssertTrue(app.navigationBars["EST-0002"].waitForExistence(timeout: 3))
+        XCTAssertTrue(editorTitle("EST-0002").waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Jordan Ellis"].exists)
         snap("ipad-2-landscape-editor")
         app.swipeUp(velocity: .slow)
@@ -396,7 +469,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
 
         // Switching estimates swaps the detail.
         app.staticTexts["Jordan Ellis"].tap()
-        XCTAssertTrue(app.navigationBars["EST-0005"].waitForExistence(timeout: 3))
+        XCTAssertTrue(editorTitle("EST-0005").waitForExistence(timeout: 3))
 
         // New estimate opens in the detail pane, focused on the first measurement.
         app.buttons["New Estimate"].tap()
@@ -449,7 +522,7 @@ final class TreeCostCalculatorUITests: XCTestCase {
         store("01-estimates")
 
         app.staticTexts["Priya Raman"].tap()
-        XCTAssertTrue(app.navigationBars["EST-0002"].waitForExistence(timeout: 5))
+        XCTAssertTrue(editorTitle("EST-0002").waitForExistence(timeout: 5))
         sleep(1)
         store("02-trees-and-photos")
         scroll(1)

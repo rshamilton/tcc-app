@@ -238,7 +238,7 @@ final class EstimateStore: ObservableObject {
             return needsQuotes ? "\"\(escaped)\"" : escaped
         }
         func amount(_ value: Double) -> String { String(format: "%.2f", value) }
-        let header = ["Number", "Status", "Created", "Updated", "Customer", "Phone", "Email", "Job site",
+        let header = ["Number", "Name", "Status", "Created", "Updated", "Customer", "Phone", "Email", "Job site",
                       "Trees", "Volume", "Volume unit", "Starting fee", "Tree removal", "Other work",
                       "Additional charge", "Discount", "Tax rate %", "Tax", "Total", "Paid", "Balance due", "Notes"]
         let dates = ISO8601DateFormatter()
@@ -246,7 +246,7 @@ final class EstimateStore: ObservableObject {
         var rows = [header.joined(separator: ",")]
         for e in sortedEstimates {
             let t = e.totals
-            let row = [e.documentLabel, e.status.title, dates.string(from: e.createdAt), dates.string(from: e.updatedAt),
+            let row = [e.documentLabel, e.title, e.status.title, dates.string(from: e.createdAt), dates.string(from: e.updatedAt),
                        e.customerName, e.customerPhone, e.customerEmail, e.address,
                        String(e.measuredTreeCount), String(format: "%.2f", t.volume), e.unitSystem.volumeUnit,
                        amount(t.startingFee), amount(t.volumeCost), amount(t.lineItems), amount(t.surcharge),

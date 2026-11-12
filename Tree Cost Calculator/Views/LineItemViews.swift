@@ -26,6 +26,7 @@ struct LineItemRow: View {
                 .font(.headline)
                 .textInputAutocapitalization(.sentences)
                 .focused(focus, equals: .itemName(item.id))
+                .accessibilityIdentifier("lineItemNameField")
 
             if typeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 10) { quantityField; priceField }
@@ -79,7 +80,8 @@ struct LineItemRow: View {
     private var quantityField: some View {
         HStack(spacing: 6) {
             NumberField(placeholder: "1", value: $item.quantity, alignment: .leading,
-                        accessibilityLabel: "Quantity for \(item.displayName)")
+                        accessibilityLabel: "Quantity for \(item.displayName)",
+                        identifier: "lineItemQuantityField")
                 .focused(focus, equals: .itemQuantity(item.id))
                 .frame(minWidth: 44)
             TextField("unit", text: $item.unit)
@@ -114,8 +116,8 @@ struct LineItemRow: View {
     /// Stump grinding is priced by diameter, which is easy to get wrong in the yard.
     private var measureHint: String? {
         switch item.unit.trimmed.lowercased() {
-        case "in": return "Measure the stump's widest diameter in inches"
-        case "cm": return "Measure the stump's widest diameter in centimeters"
+        case "in": return "Measure the stump's widest diameter in inches. Stumps are usually a little wider than the trunk, so check this number."
+        case "cm": return "Measure the stump's widest diameter in centimeters. Stumps are usually a little wider than the trunk, so check this number."
         default: return nil
         }
     }

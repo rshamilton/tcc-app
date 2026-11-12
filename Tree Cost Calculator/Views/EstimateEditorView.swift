@@ -8,12 +8,26 @@ import UIKit
 
 /// Every input that can hold keyboard focus, so "Next" / "Previous" can walk the whole form.
 enum EditorField: Hashable {
+    case title
     case label(UUID), circumference(UUID), height(UUID)
     case name, phone, email, address
     case itemName(UUID), itemQuantity(UUID), itemPrice(UUID)
     case fee, rate, surchargeLabel, surchargeAmount, discount, tax
     case deposit, amountPaid
     case notes
+}
+
+/// Which tree the "Enter Trunk Diameter" sheet is for: an existing one, or a new one to add.
+private enum DiameterTarget: Identifiable {
+    case tree(UUID)
+    case newTree
+
+    var id: String {
+        switch self {
+        case .tree(let id): return id.uuidString
+        case .newTree: return "new"
+        }
+    }
 }
 
 struct EstimateEditorView: View {
@@ -30,6 +44,7 @@ struct EstimateEditorView: View {
     @State private var showContacts = false
     @State private var showSignature = false
     @State private var confirmDelete = false
+    @State private var diameterTarget: DiameterTarget?
     @FocusState private var focus: EditorField?
 
     init(estimate: Estimate) {
@@ -41,6 +56,7 @@ struct EstimateEditorView: View {
 
     var body: some View {
         List {
+            nameSection
             treesSection
             otherWorkSection
             customerSection
@@ -56,7 +72,7 @@ struct EstimateEditorView: View {
         .frame(maxWidth: 720)
         .frame(maxWidth: .infinity)
         .background(Color(.systemGroupedBackground))
-        .navigationTitle(estimate.documentLabel)
+        .navigationTitle(estimate.isUnnamed ? estimate.documentLabel : estimate.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
@@ -86,6 +102,12 @@ struct EstimateEditorView: View {
             SignatureCaptureSheet(customerName: estimate.customerName) { png, name in
                 saveSignature(png, name: name)
             }
+        }
+        .sheet(item: $diameterTarget) { target in
+            TrunkDiameterSheet(units: units, initialDiameter: initialDiameter(for: target)) { diameter in
+                applyDiameter(diameter, to: target)
+            }
+            .presentationDetents([.medium])
         }
         .confirmationDialog("Delete this estimate?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete Estimate", role: .destructive) {
@@ -120,6 +142,28 @@ struct EstimateEditorView: View {
         }
     }
 
+    // MARK: - Name
+
+    private var nameSection: some View {
+        Section {
+            TextField("e.g. Backyard oak removal", text: $estimate.title)
+                .font(.title3.weight(.semibold))
+                .textInputAutocapitalization(.sentences)
+                .submitLabel(.next)
+                .focused($focus, equals: .title)
+                .onSubmit { moveFocus(1) }
+                .accessibilityLabel("Estimate name")
+                .accessibilityIdentifier("estimateNameField")
+            Text("\(estimate.documentLabel) · created \(estimate.createdAt.formatted(date: .abbreviated, time: .omitted))")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } header: {
+            Text("Estimate name")
+        } footer: {
+            Text("Shown in your list and on the PDF. Leave empty to use the customer's name.")
+        }
+    }
+
     // MARK: - Trees
 
     private var treesSection: some View {
@@ -131,6 +175,7 @@ struct EstimateEditorView: View {
                     units: units,
                     focus: $focus,
                     onDuplicate: { duplicateTree(tree.id) },
+                    onEnterDiameter: { diameterTarget = .tree(tree.id) },
                     onDelete: { deleteTree(tree.id) }
                 )
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -146,19 +191,27 @@ struct EstimateEditorView: View {
                 }
             }
 
-            Button {
-                addTree()
+            // Tap adds a tree right away; press and hold for the other ways to add one.
+            Menu {
+                Button { addTree() } label: { Label("Add Tree", systemImage: "plus") }
+                Button { diameterTarget = .newTree } label: {
+                    Label("Add Tree by Trunk Diameter…", systemImage: "circle.dashed")
+                }
             } label: {
                 Label(estimate.trees.isEmpty ? "Add Tree" : "Add Another Tree", systemImage: "plus.circle.fill")
                     .font(.body.weight(.semibold))
+            } primaryAction: {
+                addTree()
             }
+            .accessibilityIdentifier("addTreeMenu")
+            .accessibilityHint("Adds a tree. Touch and hold to enter a trunk diameter instead")
         } header: {
             Text("Trees")
         } footer: {
             if totals.volume > 0 {
                 Text("Total volume: \(Format.volume(totals.volume, in: units)) across \(estimate.measuredTreeCount) \(estimate.measuredTreeCount == 1 ? "tree" : "trees")")
             } else {
-                Text("Measure around the trunk at about 4½ ft (1.4 m) off the ground, then measure the tree's total height.")
+                Text("Measure around the trunk at about 4½ ft (1.4 m) off the ground, then measure the tree's total height. Only know the width? Use the ⋯ menu to enter the trunk diameter.")
             }
         }
     }
@@ -185,16 +238,61 @@ struct EstimateEditorView: View {
                 } label: {
                     Label("Custom item", systemImage: "square.and.pencil")
                 }
+                if !measuredTrees.isEmpty {
+                    Divider()
+                    Section("Stump grinding for…") {
+                        ForEach(measuredTrees, id: \.tree.id) { entry in
+                            Button(stumpMenuTitle(entry.tree, number: entry.number)) {
+                                addStumpGrinding(for: entry.tree, number: entry.number)
+                            }
+                        }
+                    }
+                }
             } label: {
                 Label("Add Other Work", systemImage: "plus.circle.fill")
                     .font(.body.weight(.semibold))
             }
+            .accessibilityIdentifier("addOtherWorkMenu")
             .accessibilityHint("Choose from your price list or add a custom item")
         } header: {
             Text("Other Work")
         } footer: {
             Text("Priced as quantity × price, for example stump grinding by the inch or a crew by the hour. Edit your price list in Settings.")
         }
+    }
+
+    /// Trees with a circumference, with their position in the list ("Tree 2").
+    private var measuredTrees: [(number: Int, tree: TreeItem)] {
+        estimate.trees.enumerated().compactMap { index, tree in
+            tree.circumference > 0 ? (number: index + 1, tree: tree) : nil
+        }
+    }
+
+    /// Trunk width in the estimate's small unit: inches (imperial) or centimeters (metric).
+    private func trunkDiameter(of tree: TreeItem) -> Double {
+        let diameter = TreeMath.diameter(fromCircumference: tree.circumference)
+        return units == .imperial ? diameter * 12 : diameter * 100
+    }
+
+    private func stumpMenuTitle(_ tree: TreeItem, number: Int) -> String {
+        let label = tree.label.trimmed
+        let width = "about \(Int(trunkDiameter(of: tree).rounded())) \(units == .imperial ? "in" : "cm")"
+        return label.isEmpty ? "Tree \(number), \(width)" : "Tree \(number) – \(label), \(width)"
+    }
+
+    /// Stump grinding is priced by width. The trunk width is a good start; stumps are usually a bit wider,
+    /// which the row's hint reminds the user to check. Price and minimum come from the saved "stump" service.
+    private func addStumpGrinding(for tree: TreeItem, number: Int) {
+        let label = tree.label.trimmed
+        let service = services.items.first { $0.name.localizedCaseInsensitiveContains("stump") }
+        let item = LineItem(
+            name: "Stump grinding – " + (label.isEmpty ? "Tree \(number)" : label),
+            quantity: max(1, (trunkDiameter(of: tree) - 1e-6).rounded(.up)),
+            unit: units == .imperial ? "in" : "cm",
+            unitPrice: service?.unitPrice ?? 0,
+            minimum: service?.minimum ?? 0
+        )
+        addLineItem(item)
     }
 
     private func serviceTitle(_ service: ServiceItem) -> String {
@@ -574,14 +672,20 @@ struct EstimateEditorView: View {
                     showSignature = true
                 } label: {
                     Label("Get Customer Signature", systemImage: "signature")
+                        .dimWhenDisabled()
                 }
                 .disabled(!estimate.hasBillableWork)
-                .accessibilityHint(estimate.hasBillableWork ? "Hand the phone to your customer to sign" : "Add the work and prices first")
+                .accessibilityIdentifier("getSignatureButton")
+                .accessibilityHint(estimate.hasBillableWork ? "Hand the phone to your customer to sign" : "Add a measured tree or other work first")
             }
         } header: {
             Text("Customer Signature")
         } footer: {
-            Text("Hand the phone to your customer to sign that they accept the estimate. The signature is printed on the PDF.")
+            if estimate.signatureID == nil && !estimate.hasBillableWork {
+                Text("Add a measured tree or other work first, then hand the phone to your customer to sign. The signature is printed on the PDF.")
+            } else {
+                Text("Hand the phone to your customer to sign that they accept the estimate. The signature is printed on the PDF.")
+            }
         }
     }
 
@@ -666,6 +770,11 @@ struct EstimateEditorView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
                 .contentTransition(.numericText())
+            if !estimate.hasBillableWork {
+                Text("Add a tree or other work to share")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
         .accessibilityElement(children: .combine)
     }
@@ -685,7 +794,8 @@ struct EstimateEditorView: View {
         .controlSize(.large)
         .layoutPriority(1)
         .disabled(!estimate.hasBillableWork)
-        .accessibilityHint(estimate.hasBillableWork ? "Creates a PDF you can send to the customer" : "Enter a tree's measurements or add other work first")
+        .accessibilityIdentifier("previewShareButton")
+        .accessibilityHint(estimate.hasBillableWork ? "Creates a PDF you can send to the customer" : "Add a measured tree or other work first")
     }
 
     @ViewBuilder
@@ -744,7 +854,7 @@ struct EstimateEditorView: View {
     // MARK: - Focus order
 
     private var focusOrder: [EditorField] {
-        var order: [EditorField] = []
+        var order: [EditorField] = [.title]
         for tree in estimate.trees {
             order += [.label(tree.id), .circumference(tree.id), .height(tree.id)]
         }
@@ -806,10 +916,33 @@ struct EstimateEditorView: View {
         )
     }
 
-    private func addTree() {
-        let tree = TreeItem()
+    private func addTree(circumference: Double = 0) {
+        let tree = TreeItem(circumference: circumference)
         withAnimation { estimate.trees.append(tree) }
-        Task { await focusWhenReady(.circumference(tree.id), firstDelay: 250) }
+        // With the trunk already known, the height is the next thing to enter.
+        let target: EditorField = circumference > 0 ? .height(tree.id) : .circumference(tree.id)
+        Task { await focusWhenReady(target, firstDelay: 250) }
+    }
+
+    /// Starting value for the diameter sheet: the tree's current width, or empty.
+    private func initialDiameter(for target: DiameterTarget) -> Double {
+        guard case .tree(let id) = target, let tree = estimate.trees.first(where: { $0.id == id }),
+              tree.circumference > 0 else { return 0 }
+        return (trunkDiameter(of: tree) * 10).rounded() / 10
+    }
+
+    /// Circumference = π × diameter, converted to the estimate's length unit and rounded to 2 decimals.
+    private func applyDiameter(_ diameter: Double, to target: DiameterTarget) {
+        guard diameter > 0 else { return }
+        let inUnit = units == .imperial ? diameter / 12 : diameter / 100
+        let circumference = (TreeMath.circumference(fromDiameter: inUnit) * 100).rounded() / 100
+        switch target {
+        case .newTree:
+            addTree(circumference: circumference)
+        case .tree(let id):
+            guard let index = estimate.trees.firstIndex(where: { $0.id == id }) else { return }
+            estimate.trees[index].circumference = circumference
+        }
     }
 
     /// Focus is ignored while a screen or row is still animating in, so retry until it sticks
@@ -850,10 +983,10 @@ struct TreeRow: View {
     let units: UnitSystem
     var focus: FocusState<EditorField?>.Binding
     let onDuplicate: () -> Void
+    let onEnterDiameter: () -> Void
     let onDelete: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
-    @State private var showHeightMeasure = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -872,7 +1005,7 @@ struct TreeRow: View {
                 Spacer()
                 Menu {
                     Button(action: onDuplicate) { Label("Duplicate", systemImage: "plus.square.on.square") }
-                    Button { showHeightMeasure = true } label: { Label("Measure Height…", systemImage: "angle") }
+                    Button(action: onEnterDiameter) { Label("Enter Trunk Diameter…", systemImage: "circle.dashed") }
                     Button(role: .destructive, action: onDelete) { Label("Delete Tree", systemImage: "trash") }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -882,6 +1015,7 @@ struct TreeRow: View {
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Tree \(number) options")
+                .accessibilityIdentifier("treeOptionsMenu")
             }
 
             TextField("Name or note, e.g. Oak by driveway", text: $tree.label)
@@ -898,21 +1032,13 @@ struct TreeRow: View {
                 Text(diameter)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("trunkDiameterCaption")
             }
-
-            Button { showHeightMeasure = true } label: {
-                Label("Measure Height…", systemImage: "angle")
-                    .font(.subheadline)
-            }
-            .accessibilityHint("Uses the camera tilt to estimate the tree's height")
 
             PhotoAttachments(ids: $tree.photoIDs)
         }
         .padding(.vertical, 6)
         .buttonStyle(.borderless)
-        .sheet(isPresented: $showHeightMeasure) {
-            HeightMeasureSheet(units: units, onUse: { tree.height = $0 })
-        }
     }
 
     private var circumferenceField: some View {
@@ -931,9 +1057,8 @@ struct TreeRow: View {
     private var diameterText: String? {
         guard tree.circumference > 0 else { return nil }
         let diameter = tree.circumference / Double.pi
-        return units == .imperial
-            ? "Diameter ≈ \(Format.number(diameter * 12)) in"
-            : "Diameter ≈ \(Format.number(diameter * 100)) cm"
+        let shown = ((units == .imperial ? diameter * 12 : diameter * 100) * 10).rounded() / 10
+        return "Diameter ≈ \(Format.number(shown)) \(units == .imperial ? "in" : "cm")"
     }
 }
 
@@ -958,6 +1083,69 @@ private struct SignaturePreview: View {
         .task(id: id) {
             let target = id
             image = await Task.detached { PhotoStore.image(for: target, maxPixel: 800) }.value
+        }
+    }
+}
+
+// MARK: - Trunk diameter sheet
+
+/// Asks for the trunk's width, for people who measure across the trunk instead of around it.
+struct TrunkDiameterSheet: View {
+    let units: UnitSystem
+    let onDone: (Double) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var diameter: Double
+    @FocusState private var focused: Bool
+
+    init(units: UnitSystem, initialDiameter: Double, onDone: @escaping (Double) -> Void) {
+        self.units = units
+        self.onDone = onDone
+        _diameter = State(initialValue: initialDiameter)
+    }
+
+    private var unit: String { units == .imperial ? "in" : "cm" }
+    private var unitName: String { units == .imperial ? "inches" : "centimeters" }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    LabeledContent("Trunk diameter") {
+                        NumberField(placeholder: "0", value: $diameter, suffix: unit,
+                                    accessibilityLabel: "Trunk diameter in \(unitName)",
+                                    identifier: "trunkDiameterField")
+                            .focused($focused)
+                    }
+                } footer: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Measure across the trunk at chest height (about 4½ ft / 1.4 m)")
+                        Text(diameter > 0
+                             ? "The app turns this into the distance around the trunk."
+                             : "Enter the width to continue.")
+                    }
+                }
+            }
+            .navigationTitle("Trunk Diameter")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        onDone(diameter)
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(diameter <= 0)
+                    .accessibilityHint(diameter > 0 ? "Sets the tree's circumference" : "Enter the trunk diameter first")
+                }
+            }
+            .task {
+                try? await Task.sleep(for: .milliseconds(350))
+                focused = true
+            }
         }
     }
 }

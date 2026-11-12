@@ -15,10 +15,14 @@ No ads, no subscription, no account, works offline, and the code is open source 
 
 **Estimate tree removal on the spot**
 - Enter a trunk's circumference and height; the app shows the volume and the price immediately (feet or meters).
+- Or enter the **trunk diameter** (inches or cm); the app converts it to circumference (π × diameter), and each tree shows its approximate diameter.
+- **Name your estimates** (an optional job name such as "Backyard oak removal"), shown in the list, searchable, printed on the PDF, and renamable from the list.
 - Any number of trees per job, each with a name, measurements and photos.
 - Your own starting fee, price per cubic foot (or cubic meter) and tax rate, plus a discount or additional charge.
 - **Other work as line items**: stump grinding priced per inch of diameter with a minimum charge, trimming and pruning,
   haul away, crew labor by the hour, crane or bucket truck time, emergency storm work. Keep a saved price list.
+- **Stump grinding for a tree**: one tap adds a stump grinding line sized from that tree's diameter and priced from your
+  saved stump grinding service (price per inch, optional minimum charge).
 - **Tax regions**: a tax rate and license number for each state or area you work in.
 
 **Send it, get it signed, get paid**
@@ -29,12 +33,6 @@ No ads, no subscription, no account, works offline, and the code is open source 
   instructions. Statuses Draft, Sent, Approved, Declined, Invoiced and Paid, with Open, Won and Unpaid totals.
 - Import the customer from Contacts; call, email or get directions with a tap.
 - Search, duplicate, and **export everything to CSV**.
-
-**Tree Tools (field calculators)**
-- **Tree height** using the phone's tilt sensor (clinometer, tangent method).
-- **Trunk diameter (DBH)** from circumference.
-- **Stump grinding price**, **firewood cords** and face cords, **log board feet** (Doyle and International ¼-inch rules),
-  and approximate **green log weight** by species.
 
 **Your data stays yours**
 - No account, no ads, no analytics, no tracking, no network requests.
@@ -66,11 +64,15 @@ never receives it.
 
 **Can I make invoices?** Yes. Open an estimate, then choose Create Invoice from the status menu.
 
-**How do I price stump grinding?** Add a Stump grinding line item under Other Work: quantity = the stump's widest
-diameter in inches, price per inch, and an optional minimum charge.
+**How do I price stump grinding?** On a tree, tap "Stump grinding for…" to add a line sized from that tree's diameter and
+priced from your saved stump grinding service. You can also add a Stump grinding line under Other Work yourself:
+quantity = the stump's widest diameter in inches, price per inch, and an optional minimum charge.
 
-**How does it measure tree height?** Stand a known distance from the tree, sight along the phone at the top and then at
-the base; height = distance × (tan top angle + tan base angle).
+**Can I enter the trunk diameter instead of the circumference?** Yes. Enter the diameter in inches or cm and the app
+converts it to circumference (π × diameter) before pricing.
+
+**Can I name my estimates?** Yes. An optional job name appears in the list, is searchable, and prints on the PDF. If it
+is blank, the customer's name is used.
 
 **Does it work in meters?** Yes, choose Meters in Settings. Prices are then per cubic meter.
 
@@ -97,6 +99,17 @@ Signing & Capabilities, and turn off the iCloud capability or point it at your o
 Debug builds understand a few launch arguments (see `Model/DebugLaunch.swift`), for example
 `-demoData -openEstimate 1 -showPreview` to open a seeded estimate's PDF preview. They are compiled out of Release builds.
 
+## Tests and continuous integration
+
+All UI tests live in `Tree Cost CalculatorUITests` and run through the shared scheme's test plan,
+`TreeCostCalculator.xctestplan` (one test at a time, failed tests retried once, screenshots kept). The same plan is
+used by Xcode Cloud, which runs it on every push and pull request to `main`.
+
+```bash
+xcodebuild test -project "Tree Cost Calculator.xcodeproj" -scheme "Tree Cost Calculator" -testPlan TreeCostCalculator \
+  -destination 'platform=iOS Simulator,name=iPhone 13' -parallel-testing-enabled NO
+```
+
 ## Repository layout
 
 | Path | What it is |
@@ -109,11 +122,11 @@ Debug builds understand a few launch arguments (see `Model/DebugLaunch.swift`), 
 Inside the app:
 
 - `Model/`: `Estimate` (the data model and all price math), `EstimateStore` (one JSON file per estimate, CSV export),
-  `TreeMath` (height, diameter, board feet, cords, wood weight), `DataFolder` (the visible "TCC" folder), `PhotoStore`
+  `TreeMath` (diameter and circumference conversion), `DataFolder` (the visible "TCC" folder), `PhotoStore`
   (photos, signatures and logo as files), `SettingsFile` (settings copied to `Settings.json`), `BackupMirror` (iCloud
   Drive copy and restore), `ReviewPrompter` (when to show Apple's rating prompt), `LegacyMigration`, `AppSettings`,
   `AppLinks`, `Format`.
-- `Views/`: estimate list, estimate editor, line items, signature capture, contact picker, Tree Tools, settings,
+- `Views/`: estimate list, estimate editor, line items, signature capture, contact picker, settings,
   onboarding, PDF preview, shared components.
 - `PDF/EstimatePDF.swift`: paginated PDF estimate and invoice (US Letter or A4 depending on region).
 
@@ -141,5 +154,5 @@ See [APP_STORE_EXCEPTION.md](APP_STORE_EXCEPTION.md).
 The names "Tree Cost Calculator" and "TCC" and the app icon identify the official app. If you publish your own build,
 please give it a different name and icon so users can tell them apart.
 
-Prices, volumes, heights, weights, tax rates and every other figure the app produces are estimates and examples only.
+Prices, volumes, diameters, tax rates and every other figure the app produces are estimates and examples only.
 See the [Terms of Use](https://rshamilton.github.io/treecostcalculator/terms).

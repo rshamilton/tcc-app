@@ -21,6 +21,8 @@ struct NumberField: View {
     var alignment: TextAlignment = .trailing
     /// What VoiceOver calls the field, e.g. "Tax rate". Without it the field would be read as its placeholder.
     var accessibilityLabel: String? = nil
+    /// For UI tests.
+    var identifier: String? = nil
 
     @State private var text = ""
 
@@ -35,6 +37,7 @@ struct NumberField: View {
                 .multilineTextAlignment(alignment)
                 .autocorrectionDisabled()
                 .accessibilityLabel(accessibilityLabel ?? placeholder)
+                .accessibilityIdentifier(identifier ?? "")
                 .accessibilityValue(accessibilityText)
             if let suffix {
                 Text(suffix).foregroundStyle(.secondary)
@@ -81,7 +84,8 @@ struct MeasurementField: View {
                 .accessibilityHidden(true)
             HStack(spacing: 6) {
                 NumberField(placeholder: "0", value: $value, suffix: nil, alignment: .leading,
-                            accessibilityLabel: "\(title), \(unit == "ft" ? "feet" : unit == "m" ? "meters" : unit)")
+                            accessibilityLabel: "\(title), \(unit == "ft" ? "feet" : unit == "m" ? "meters" : unit)",
+                            identifier: "\(title.lowercased())Field")
                     .font(.title3.weight(.semibold))
                 Text(unit)
                     .font(.subheadline)
@@ -116,6 +120,23 @@ struct IconField: View {
             TextField(placeholder, text: $text)
         }
     }
+}
+
+// MARK: - Disabled look
+
+/// Buttons inside a List or Form keep the accent colour even when disabled, so they look tappable but
+/// do nothing. Put this on the button's label (inside the button, so it can see `.disabled`) to grey it out.
+struct DimWhenDisabled: ViewModifier {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func body(content: Content) -> some View {
+        content.foregroundStyle(isEnabled ? AnyShapeStyle(.tint) : AnyShapeStyle(.tertiary))
+    }
+}
+
+extension View {
+    /// Greys out a button label while the button is disabled. Apply to the label, not the button.
+    func dimWhenDisabled() -> some View { modifier(DimWhenDisabled()) }
 }
 
 // MARK: - Status

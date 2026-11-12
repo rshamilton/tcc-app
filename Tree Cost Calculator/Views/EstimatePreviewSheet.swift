@@ -104,7 +104,9 @@ struct EstimatePreviewSheet: View {
 
     private var fileName: String {
         let invalid = CharacterSet(charactersIn: "/\\:?%*|\"<>").union(.newlines).union(.controlCharacters)
-        var safe = estimate.customerName.trimmed.components(separatedBy: invalid).joined()
+        // The customer's name identifies the file best; the job name stands in when there is none.
+        let base = estimate.customerName.trimmed.isEmpty ? estimate.title.trimmed : estimate.customerName.trimmed
+        var safe = base.components(separatedBy: invalid).joined()
             .replacingOccurrences(of: " ", with: "-")
         while safe.hasPrefix(".") { safe.removeFirst() }
         safe = String(safe.prefix(60))

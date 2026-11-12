@@ -4,10 +4,9 @@
 
 Key facts:
 - Price per tree = starting fee + volume x rate, where volume = circumference x circumference x height / 12.56 (cubic feet, or cubic meters if you measure in meters). Example: 6 ft circumference, 50 ft height = 143.3 cu ft; at $10 per cu ft plus a $150 starting fee = $1,583.12 (example rates only; the user sets their own).
-- Unlimited trees per job, each with name, measurements and photos. Other Work line items (quantity x unit price with optional minimum charge) for stump grinding per inch of diameter, trimming and pruning, haul away, crew labor, crane or bucket truck, storm work, with a saved price list.
+- Unlimited trees per job, each with name, measurements and photos. Trees can be entered by circumference or trunk diameter (inches or cm; the app converts diameter to circumference) and each shows its approximate diameter. Estimates can be given an optional job name (searchable, shown in the list and printed on the PDF). Other Work line items (quantity x unit price with optional minimum charge) for stump grinding per inch of diameter ("Stump grinding for <tree>" sizes it from that tree's diameter using the saved stump grinding service), trimming and pruning, haul away, crew labor, crane or bucket truck, storm work, with a saved price list.
 - Additional charge and discount (dollars or percent), tax regions with tax rate and license number per state, deposit on acceptance.
 - Customer signs on the phone; professional PDF estimate with logo, license number, terms, photos and signature block; one-tap convert to invoice with Invoiced and Paid status, due date, amount paid and balance due.
-- Tree Tools: tree height with the phone's tilt sensor (tangent method), trunk diameter (DBH), stump grinding price, firewood cords, log board feet (Doyle and International 1/4-inch), approximate green log weight by species.
 - Privacy: data stays on the device as files in a TCC folder in the Files app, with optional backup to the user's own iCloud Drive. The developer receives no data and uses no analytics.
 - Free: no ads, no subscription, no in-app purchases.
 

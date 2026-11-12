@@ -20,7 +20,9 @@ struct EstimatesListView: View {
     @State private var filter: EstimateStatus?
     @State private var showSettings = false
     @State private var pendingDelete: Estimate?
-    @State private var showTools = false
+    @State private var renaming: Estimate?
+    @State private var showRename = false
+    @State private var renameText = ""
     @Environment(\.dynamicTypeSize) private var typeSize
 
     private var visible: [Estimate] {
@@ -32,7 +34,7 @@ struct EstimatesListView: View {
             // Searching looks at everything: the status chips are hidden meanwhile, so a leftover filter
             // must not silently narrow the results.
             result = result.filter { e in
-                let fields = [e.customerName, e.address, e.customerPhone, e.customerEmail,
+                let fields = [e.title, e.customerName, e.address, e.customerPhone, e.customerEmail,
                               e.numberLabel, e.invoiceLabel, e.notes] + e.lineItems.map(\.name)
                 return fields.contains { $0.localizedCaseInsensitiveContains(query) }
             }
@@ -48,7 +50,20 @@ struct EstimatesListView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $showSettings) { SettingsView().environmentObject(store) }
-        .sheet(isPresented: $showTools) { ToolsView() }
+        .alert("Rename Estimate", isPresented: $showRename) {
+            TextField("e.g. Backyard oak removal", text: $renameText)
+                .textInputAutocapitalization(.sentences)
+            Button("Save") {
+                if var estimate = renaming.flatMap({ store.estimate(id: $0.id) }) {
+                    estimate.title = renameText.trimmed
+                    store.update(estimate)
+                }
+                renaming = nil
+            }
+            Button("Cancel", role: .cancel) { renaming = nil }
+        } message: {
+            Text("Shown in your list and on the PDF. Leave empty to use the customer's name.")
+        }
         .confirmationDialog(
             "Delete this estimate?",
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
@@ -101,12 +116,6 @@ struct EstimatesListView: View {
         }
         .navigationTitle("Estimates")
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { showTools = true } label: {
-                    Image(systemName: "ruler")
-                }
-                .accessibilityLabel("Tree Tools")
-            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showSettings = true } label: {
                     Image(systemName: "gearshape")
@@ -164,6 +173,11 @@ struct EstimatesListView: View {
                         .tint(.blue)
                     }
                     .contextMenu {
+                        Button {
+                            renameText = estimate.title
+                            renaming = estimate
+                            showRename = true
+                        } label: { Label("Rename…", systemImage: "pencil") }
                         Button { duplicate(estimate) } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
                         Menu {
                             ForEach(EstimateStatus.allCases) { status in
@@ -403,8 +417,15 @@ struct EstimateRow: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(estimate.displayName)
                 .font(.headline)
-                .foregroundStyle(estimate.customerName.trimmed.isEmpty ? .secondary : .primary)
+                .foregroundStyle(estimate.isUnnamed ? .secondary : .primary)
                 .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+            // With a job name as the headline, the customer still shows up underneath.
+            if !estimate.title.trimmed.isEmpty && !estimate.customerName.trimmed.isEmpty {
+                Text(estimate.customerName.trimmed)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+            }
             if !estimate.address.trimmed.isEmpty {
                 Text(estimate.address)
                     .font(.subheadline)

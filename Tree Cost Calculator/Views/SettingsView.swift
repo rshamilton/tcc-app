@@ -346,6 +346,7 @@ struct SettingsView: View {
 
     private var dataFooter: String {
         let files = "Everything is saved as ordinary files in the “TCC” folder in the Files app, so you can see exactly what uses space."
+        if store.estimates.isEmpty { return files + " Export is available once you have an estimate." }
         if !iCloudAvailable {
             return files + " Sign in to iCloud and turn on iCloud Drive to also back it up automatically."
         }
@@ -381,7 +382,10 @@ struct SettingsView: View {
             }
             Button(action: exportCSV) {
                 Label("Export All Estimates (CSV)", systemImage: "tablecells")
+                    .dimWhenDisabled()
             }
+            .disabled(store.estimates.isEmpty)
+            .accessibilityHint(store.estimates.isEmpty ? "Create an estimate first" : "Saves all your estimates as a spreadsheet")
             if iCloudAvailable {
                 Button {
                     confirmRestore = true

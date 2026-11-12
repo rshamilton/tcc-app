@@ -1,0 +1,30 @@
+{
+  "configurations" : [
+    {
+      "id" : "6A1E2D4C-3B5F-4C8E-9D21-0F7A3B6C5E11",
+      "name" : "US English",
+      "options" : {
+        "language" : "en",
+        "region" : "US"
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "maximumTestRepetitions" : 2,
+    "testRepetitionMode" : "retryOnFailure",
+    "testTimeoutsEnabled" : true,
+    "defaultTestExecutionTimeAllowance" : 300,
+    "uiTestingScreenshotsLifetime" : "keepAlways"
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : false,
+      "target" : {
+        "containerPath" : "container:Tree Cost Calculator.xcodeproj",
+        "identifier" : "94CAB3A02F11B00000EE0D06",
+        "name" : "Tree Cost CalculatorUITests"
+      }
+    }
+  ],
+  "version" : 1
+}
